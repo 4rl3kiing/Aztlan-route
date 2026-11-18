@@ -65,9 +65,14 @@ class BrowserSessionWorker(QObject):
     @Slot()
     def _inspect_authentication_challenge(self) -> None:
         """Detect common challenge indicators without reading page text or secrets."""
-        if self._page is None:
+        if self._context is None:
             return
         try:
+            pages = self._context.pages
+            if not pages:
+                return
+            # Providers may open a dedicated challenge or callback tab after launch.
+            self._page = pages[-1]
             url = self._page.url or ""
             title = self._page.title()
             challenge = detect_authentication_challenge(
