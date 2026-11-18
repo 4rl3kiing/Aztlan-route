@@ -43,3 +43,35 @@ def detect_authentication_challenge(
     ):
         return "mfa_required"
     return None
+
+
+
+def detect_authentication_state(
+    *,
+    url: str,
+    title: str,
+    captcha_element_count: int = 0,
+    mfa_element_count: int = 0,
+    login_form_detected: bool = False,
+) -> str | None:
+    """Detect explicit challenge or sign-in indicators without inspecting credentials."""
+    challenge = detect_authentication_challenge(
+        url=url,
+        title=title,
+        captcha_element_count=captcha_element_count,
+        mfa_element_count=mfa_element_count,
+    )
+    if challenge:
+        return challenge
+    if type(login_form_detected) is not bool:
+        return None
+    path = urlparse(url.lower()).path.rstrip("/") or "/"
+    login_paths = (
+        "/login", "/log-in", "/signin", "/sign-in", "/session-expired",
+        "/reauthenticate", "/reauth",
+    )
+    if path in login_paths or any(path.endswith(marker) for marker in login_paths):
+        return "reauthentication_required"
+    if login_form_detected:
+        return "reauthentication_required"
+    return None
