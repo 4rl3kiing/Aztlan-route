@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from platformdirs import user_data_dir
-from PySide6.QtCore import QMetaObject, QObject, QThread, Qt, Signal, Slot
+from PySide6.QtCore import QMetaObject, QObject, QThread, QTimer, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QLabel, QListWidget, QMainWindow,
     QMessageBox, QPushButton, QVBoxLayout, QWidget,
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from playwright.sync_api import sync_playwright
 
 from . import __version__
+from .authentication import detect_authentication_challenge
 from .browser import launch_provider
 from .conversations import ConversationStore
 from .providers import Provider, load_providers
@@ -25,6 +26,7 @@ class BrowserSessionWorker(QObject):
     opened = Signal()
     failed = Signal(str)
     closed = Signal()
+    authentication_state = Signal(str, str, str)
 
     def __init__(self, provider: Provider, browser: str, profile_root: Path) -> None:
         super().__init__()
@@ -33,6 +35,9 @@ class BrowserSessionWorker(QObject):
         self.profile_root = profile_root
         self._driver = None
         self._context = None
+        self._page = None
+        self._auth_timer = None
+        self._authentication_status = "awaiting_user"
 
     @Slot()
     def start(self) -> None:
@@ -41,6 +46,12 @@ class BrowserSessionWorker(QObject):
             self._context = launch_provider(
                 self._driver, self.provider, self.browser, self.profile_root
             )
+            self._page = self._context.pages[0] if self._context.pages else None
+            self._auth_timer = QTimer(self)
+            self._auth_timer.setInterval(2000)
+            self._auth_timer.timeout.connect(self._inspect_authentication_challenge)
+            self._auth_timer.start()
+            self.authentication_state.emit(self.provider.id, self.browser, self._authentication_status)
         except Exception as exc:
             try:
                 self._stop_resources()
@@ -50,8 +61,44 @@ class BrowserSessionWorker(QObject):
             return
         self.opened.emit()
 
+    @Slot()
+    def _inspect_authentication_challenge(self) -> None:
+        """Detect common challenge indicators without reading page text or secrets."""
+        if self._page is None:
+            return
+        try:
+            url = self._page.url or ""
+            title = self._page.title()
+            challenge = detect_authentication_challenge(
+                url=url,
+                title=title,
+                captcha_element_count=self._page.locator(
+                    'iframe[src*="captcha" i], [id*="captcha" i], [class*="captcha" i]'
+                ).count(),
+                mfa_element_count=self._page.locator(
+                    'input[autocomplete="one-time-code"], input[name*="otp" i], '
+                    'input[name*="verification-code" i]'
+                ).count(),
+            )
+        except Exception:
+            # A transient navigation or closed page must not terminate the browser session.
+            return
+        if challenge and challenge != self._authentication_status:
+            self._authentication_status = challenge
+            self.authentication_state.emit(self.provider.id, self.browser, challenge)
+
+    @Slot()
+    def confirm_authenticated(self) -> None:
+        """Record the operator's explicit confirmation; this is not API verification."""
+        self._authentication_status = "authenticated_user_confirmed"
+        self.authentication_state.emit(self.provider.id, self.browser, self._authentication_status)
+
     def _stop_resources(self) -> None:
         errors = []
+        if self._auth_timer is not None:
+            self._auth_timer.stop()
+            self._auth_timer = None
+        self._page = None
         if self._context is not None:
             try:
                 self._context.close()
@@ -90,6 +137,7 @@ class MainWindow(QMainWindow):
         catalog = Path(__file__).with_name("providers.json")
         self.providers = load_providers(catalog)
         self._sessions: list[tuple[QThread, BrowserSessionWorker, str, str]] = []
+        self._auth_states: dict[str, str] = {}
         self._closing = False
         self.conversations = ConversationStore(self.data_root / "conversations.sqlite3")
         self.session_manager = SessionManager(self.profile_root)
@@ -135,12 +183,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel("Sesiones de navegador activas"))
         self.active_sessions = QListWidget()
         layout.addWidget(self.active_sessions)
+        self.authentication_status_label = QLabel("Autenticación: sin sesión seleccionada")
+        layout.addWidget(self.authentication_status_label)
+        self.confirm_authentication_button = QPushButton("Confirmar que ya inicié sesión")
+        self.confirm_authentication_button.setEnabled(False)
+        self.confirm_authentication_button.clicked.connect(self.confirm_selected_authentication)
+        layout.addWidget(self.confirm_authentication_button)
+
         self.close_session_button = QPushButton("Cerrar sesión seleccionada")
         self.close_session_button.setEnabled(False)
         self.close_session_button.clicked.connect(self.close_selected_session)
-        self.active_sessions.currentRowChanged.connect(
-            lambda row: self.close_session_button.setEnabled(row >= 0)
-        )
+        self.active_sessions.currentRowChanged.connect(self._on_active_session_selected)
         layout.addWidget(self.close_session_button)
         self.refresh_profiles()
 
@@ -156,10 +209,59 @@ class MainWindow(QMainWindow):
         self.refresh_profiles()
         self.launch_button.setEnabled(bool(self._visible_providers))
 
+    @staticmethod
+    def _session_key(provider_id: str, browser: str) -> str:
+        return f"{provider_id}:{browser}"
+
+    def _on_active_session_selected(self, row: int) -> None:
+        valid = 0 <= row < len(self._sessions)
+        self.close_session_button.setEnabled(valid)
+        self.confirm_authentication_button.setEnabled(valid)
+        if not valid:
+            self.authentication_status_label.setText("Autenticación: sin sesión seleccionada")
+            return
+        _thread, _worker, provider_id, browser = self._sessions[row]
+        state = self._auth_states.get(self._session_key(provider_id, browser), "awaiting_user")
+        self.authentication_status_label.setText(
+            f"Autenticación ({provider_id} · {browser}): {self._authentication_label(state)}"
+        )
+
+    @staticmethod
+    def _authentication_label(state: str) -> str:
+        labels = {
+            "awaiting_user": "esperando autenticación manual",
+            "captcha_required": "CAPTCHA detectado; requiere resolución manual",
+            "mfa_required": "MFA detectado; requiere verificación manual",
+            "authenticated_user_confirmed": "confirmada por el usuario (no verifica acceso API)",
+        }
+        return labels.get(state, "estado desconocido")
+
+    @Slot(str, str, str)
+    def _on_authentication_state(self, provider_id: str, browser: str, state: str) -> None:
+        self._auth_states[self._session_key(provider_id, browser)] = state
+        self.refresh_active_sessions()
+        row = self.active_sessions.currentRow()
+        if 0 <= row < len(self._sessions):
+            self._on_active_session_selected(row)
+
     def refresh_active_sessions(self) -> None:
+        selected = self.active_sessions.currentRow()
         self.active_sessions.clear()
         for _thread, _worker, provider_id, browser in self._sessions:
-            self.active_sessions.addItem(f"{provider_id} · {browser}")
+            state = self._auth_states.get(self._session_key(provider_id, browser), "awaiting_user")
+            self.active_sessions.addItem(
+                f"{provider_id} · {browser} — {self._authentication_label(state)}"
+            )
+        if self._sessions:
+            self.active_sessions.setCurrentRow(min(max(selected, 0), len(self._sessions) - 1))
+
+    def confirm_selected_authentication(self) -> None:
+        index = self.active_sessions.currentRow()
+        if index < 0 or index >= len(self._sessions):
+            return
+        _thread, worker, _provider_id, _browser = self._sessions[index]
+        if worker.thread().isRunning():
+            QMetaObject.invokeMethod(worker, "confirm_authenticated", Qt.ConnectionType.QueuedConnection)
 
     def _profile_is_open(self, provider_id: str, browser: str) -> bool:
         return any(
@@ -226,6 +328,7 @@ class MainWindow(QMainWindow):
         worker.moveToThread(thread)
         thread.started.connect(worker.start)
         worker.opened.connect(self._on_session_opened)
+        worker.authentication_state.connect(self._on_authentication_state)
         worker.failed.connect(self._show_browser_error)
         worker.failed.connect(thread.quit)
         worker.closed.connect(thread.quit)
