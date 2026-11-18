@@ -42,20 +42,32 @@ class BrowserSessionWorker(QObject):
                 self._driver, self.provider, self.browser, self.profile_root
             )
         except (PlaywrightError, OSError, ValueError, RuntimeError) as exc:
-            self._stop_resources()
+            try:
+                self._stop_resources()
+            except Exception:
+                pass
             self.failed.emit(str(exc))
             return
         self.opened.emit()
 
     def _stop_resources(self) -> None:
-        try:
-            if self._context is not None:
+        errors = []
+        if self._context is not None:
+            try:
                 self._context.close()
-        finally:
-            self._context = None
-            if self._driver is not None:
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                self._context = None
+        if self._driver is not None:
+            try:
                 self._driver.stop()
+            except Exception as exc:
+                errors.append(exc)
+            finally:
                 self._driver = None
+        if errors:
+            raise RuntimeError("; ".join(str(error) for error in errors))
 
     @Slot()
     def close(self) -> None:
@@ -127,6 +139,11 @@ class MainWindow(QMainWindow):
         ))
         self.setCentralWidget(central)
 
+    @Slot()
+    def _on_session_opened(self) -> None:
+        self.refresh_profiles()
+        self.launch_button.setEnabled(bool(self._visible_providers))
+
     def refresh_profiles(self) -> None:
         self.profile_list.clear()
         profiles = self.session_manager.list_profiles()
@@ -153,7 +170,7 @@ class MainWindow(QMainWindow):
         worker = BrowserSessionWorker(provider, browser, self.profile_root)
         worker.moveToThread(thread)
         thread.started.connect(worker.start)
-        worker.opened.connect(self.refresh_profiles)
+        worker.opened.connect(self._on_session_opened)
         worker.failed.connect(
             lambda message: QMessageBox.critical(
                 self, "No se pudo abrir/cerrar el navegador", message
@@ -167,15 +184,18 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         for thread, worker in reversed(self._sessions[:]):
-            if thread.isRunning():
-                try:
+            try:
+                if thread.isRunning():
                     QMetaObject.invokeMethod(
                         worker, "close", Qt.ConnectionType.BlockingQueuedConnection
                     )
-                except RuntimeError:
-                    pass
-                thread.quit()
-                thread.wait()
+            except Exception:
+                # A failed session must not prevent the remaining sessions from closing.
+                pass
+            finally:
+                if thread.isRunning():
+                    thread.quit()
+                    thread.wait()
         self._sessions.clear()
         super().closeEvent(event)
 
