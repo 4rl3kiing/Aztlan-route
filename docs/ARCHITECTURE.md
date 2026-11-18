@@ -21,10 +21,12 @@ Aztlan-route is a desktop-first, single-user application for Windows and Debian 
 
 1. User selects provider and browser.
 2. Catalog validation checks HTTPS URL, provider ID, browser support and integration mode.
-3. Runtime creates a provider-specific profile directory with restrictive POSIX permissions.
-4. Browser opens the provider's official website.
-5. User signs in and operates the site directly.
-6. The browser profile persists for the next session.
+3. Runtime rejects a second launch for an already-open provider/browser profile.
+4. A dedicated Qt worker thread creates a provider-specific profile directory with restrictive POSIX permissions.
+5. Browser opens the provider's official website; failed navigation closes the partially-created context.
+6. The UI lists active sessions and allows each session to be closed independently.
+7. Application shutdown attempts to close every remaining session, even if another session reports a cleanup error.
+8. The browser profile persists for the next session.
 
 ### Documented adapter conversation
 
