@@ -102,3 +102,13 @@ HTTP server or connect the desktop chat UI. It does not include Google AI Studio
 native Gemini protocol, local inference endpoints, web-session scraping, cookie reuse,
 CAPTCHA solving, anti-bot evasion, or quota circumvention. Provider quotas and free
 tiers are subject to each provider's current terms and account limits.
+
+## TypeScript AI Router service
+
+A separate Node.js 20+ service now lives in `services/ai-browser-router`. It reads provider definitions from YAML as data, validates them, and exposes a loopback-only OpenAI-compatible HTTP surface:
+
+- `GET /health`
+- `GET /v1/models`
+- `POST /v1/chat/completions` (including upstream SSE forwarding)
+
+The first catalog includes documented HTTPS API endpoints for Groq, OpenRouter, Mistral, Cerebras and OpenAI. API keys are read from environment variables; YAML cannot name executable hooks or browser selectors. See `services/ai-browser-router/README.md` for setup and security boundaries. The browser-session subsystem remains manual-only and is not used as an API transport.

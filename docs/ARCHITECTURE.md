@@ -84,3 +84,9 @@ this router to the desktop conversation workflow and add an explicit settings UI
 provider order, model IDs and secret storage using an OS credential vault. Streaming
 fallback is deliberately prohibited after the first event to avoid mixing partial
 answers from different providers.
+
+## Independent TypeScript router service
+
+`services/ai-browser-router` is a separately deployable Node.js service alongside the Python/PySide6 desktop application. Its provider catalog is declarative YAML. The schema permits only provider identity, HTTPS base URL, environment-variable name for the API key, enabled state and model metadata. It does not accept module paths, hook names, selectors, scripts or arbitrary request templates.
+
+The initial service exposes `/health`, `/v1/models` and `/v1/chat/completions`, forwards JSON and SSE from documented OpenAI-compatible HTTPS APIs, and binds to loopback by default. The initial implementation intentionally has no cross-provider fallback, admin API, browser adapter or session store. Browser sign-in remains a user-controlled desktop workflow, not an API credential.
