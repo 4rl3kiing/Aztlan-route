@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QApplication, QComboBox, QLabel, QListWidget, QMainWindow,
     QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
-from playwright.sync_api import Error as PlaywrightError, sync_playwright
+from playwright.sync_api import sync_playwright
 
 from . import __version__
 from .browser import launch_provider
