@@ -2,31 +2,51 @@
 
 ## Deployment
 
-Aztlan-route is a desktop-first, single-user application. Provider browser profiles remain on the user's device. No remote browser farm or account/session synchronization is included.
+Aztlan-route is a desktop-first, single-user application for Windows and Debian Linux. Browser profiles and conversation history remain on the local device. No remote browser farm or account/session synchronization is included.
 
 ## Components
 
-1. Desktop shell (PySide6): provider selection, browser selection and session workspace.
-2. Provider catalog: validated metadata loaded from versioned JSON.
-3. Browser runtime (Playwright): persistent Firefox or Chromium contexts, isolated by provider/browser pair.
-4. Local data boundary: profiles under the OS-specific application data directory, never in the repository.
-5. Provider adapter boundary: manual browsing is the default. Automated interaction requires a documented, permitted interface and explicit review.
+1. **Desktop shell (PySide6):** provider selection, browser selection, local profile inventory and session launch.
+2. **Provider catalog:** validated metadata loaded from a versioned JSON resource. Provider IDs are stable identifiers.
+3. **Browser runtime (Playwright):** persistent Firefox or Chromium contexts. Every provider/browser pair has its own profile path.
+4. **Session manager:** discovers profile directories without reading cookies, passwords, tokens or browser storage.
+5. **Adapter contract and registry:** only providers explicitly marked as approved documented integrations can register an automated adapter.
+6. **Model router:** dispatches to a registered adapter and rejects empty/oversized messages or unsupported providers.
+7. **Conversation store:** SQLite persistence for conversation metadata and message text. It never stores browser authentication state.
+8. **Local data boundary:** OS-specific application data directory, separate from source and install directories.
 
-## Runtime flow
+## Runtime flows
+
+### Manual browser session
 
 1. User selects provider and browser.
 2. Catalog validation checks HTTPS URL, provider ID, browser support and integration mode.
 3. Runtime creates a provider-specific profile directory with restrictive POSIX permissions.
 4. Browser opens the provider's official website.
 5. User signs in and operates the site directly.
-6. Browser profile persists for the next session.
+6. The browser profile persists for the next session.
+
+### Documented adapter conversation
+
+1. Provider metadata must explicitly declare `documented_api` and `automation_allowed=true`.
+2. A reviewed adapter is registered for that provider ID.
+3. The router validates message input and resolves the adapter.
+4. Adapter performs the request through the documented, permitted interface.
+5. ConversationStore persists the user's message and adapter response when called by the conversation workflow.
+
+No provider adapter is enabled by default in this repository. The initial provider catalog is manual-browser only.
+
+## Debian
+
+The Debian installer creates a private virtual environment, installs Playwright browser dependencies and Chromium/Firefox, and creates a desktop entry. Target is Debian 12+ on 64-bit desktop systems with Python 3.11+.
 
 ## Planned extension points
 
 - OS credential vault integration for application-owned secrets (Windows Credential Manager, macOS Keychain or Secret Service).
-- Adapter SDK for documented APIs or explicitly authorized integrations.
+- Reviewed adapters for documented APIs or expressly authorized provider integrations.
 - Session health checks that do not inspect or export authentication material.
-- Unified conversation UI only for providers with supported integration paths.
+- Unified chat UI only for providers with supported integration paths.
+- Background browser launch workers and graceful session lifecycle management.
 
 ## Non-goals
 
