@@ -168,3 +168,64 @@ def test_worker_confirmation_emits_explicit_user_confirmed_state(tmp_path):
     worker.confirm_authenticated()
 
     assert received == [("manual", "chromium", "authenticated_user_confirmed")]
+
+
+
+def test_worker_reauthentication_reuses_existing_context(tmp_path):
+    from aztlan_route.app import BrowserSessionWorker
+
+    provider = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+
+    class Page:
+        brought_to_front = False
+
+        def bring_to_front(self):
+            self.brought_to_front = True
+
+    class Context:
+        pages = [Page()]
+
+    worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+    worker._context = Context()
+    received = []
+    worker.authentication_state.connect(lambda *args: received.append(args))
+
+    worker.request_reauthentication()
+
+    assert worker._page is worker._context.pages[0]
+    assert worker._page.brought_to_front
+    assert received == [("manual", "chromium", "awaiting_user")]
+
+
+def test_worker_reauthentication_reopens_closed_tab(tmp_path):
+    from aztlan_route.app import BrowserSessionWorker
+
+    provider = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+
+    class Page:
+        url = "about:blank"
+        navigated = None
+
+        def goto(self, url, **_kwargs):
+            self.navigated = url
+
+    class Context:
+        pages = []
+
+        def new_page(self):
+            page = Page()
+            self.pages.append(page)
+            return page
+
+    worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+    worker._context = Context()
+    worker.request_reauthentication()
+
+    assert worker._page is worker._context.pages[0]
+    assert worker._page.navigated == provider.url
