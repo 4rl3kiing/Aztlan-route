@@ -131,6 +131,17 @@ class MainWindow(QMainWindow):
         self.refresh_button = QPushButton("Actualizar perfiles")
         self.refresh_button.clicked.connect(self.refresh_profiles)
         layout.addWidget(self.refresh_button)
+
+        layout.addWidget(QLabel("Sesiones de navegador activas"))
+        self.active_sessions = QListWidget()
+        layout.addWidget(self.active_sessions)
+        self.close_session_button = QPushButton("Cerrar sesión seleccionada")
+        self.close_session_button.setEnabled(False)
+        self.close_session_button.clicked.connect(self.close_selected_session)
+        self.active_sessions.currentRowChanged.connect(
+            lambda row: self.close_session_button.setEnabled(row >= 0)
+        )
+        layout.addWidget(self.close_session_button)
         self.refresh_profiles()
 
         layout.addWidget(QLabel(
