@@ -24,8 +24,11 @@ Aztlan-route is a desktop-first, single-user application for Windows and Debian 
 3. Runtime rejects a second launch for an already-open provider/browser profile.
 4. A dedicated Qt worker thread creates a provider-specific profile directory with restrictive POSIX permissions.
 5. Browser opens the provider's official website; failed navigation closes the partially-created context.
-6. The UI lists active sessions and allows each session to be closed independently.
-7. Application shutdown attempts to close every remaining session, even if another session reports a cleanup error.
+6. A worker-thread timer checks the active page URL, title and common visible CAPTCHA/MFA elements; it does not read page body text or authentication storage.
+7. CAPTCHA and MFA remain user-operated on the provider website. The UI reports detected challenges and waits without blocking the Qt event loop.
+8. The operator explicitly confirms successful sign-in. This is recorded as user-confirmed, not independently verified, and does not imply API/chat integration.
+9. The UI lists active sessions and allows each session to be closed independently.
+10. Application shutdown attempts to close every remaining session, even if another session reports a cleanup error.
 8. The browser profile persists for the next session.
 
 ### Documented adapter conversation
@@ -47,6 +50,7 @@ The Debian installer creates a private virtual environment, installs Playwright 
 - OS credential vault integration for application-owned secrets (Windows Credential Manager, macOS Keychain or Secret Service).
 - Reviewed adapters for documented APIs or expressly authorized provider integrations.
 - Session health checks that do not inspect or export authentication material.
+- Provider-specific, documented authentication-completion checks where officially supported.
 - Unified chat UI only for providers with supported integration paths.
 - Background browser launch workers and graceful session lifecycle management.
 
