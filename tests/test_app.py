@@ -60,3 +60,20 @@ def test_worker_closes_driver_even_if_context_close_fails(tmp_path):
     assert driver.stopped
     assert worker._context is None
     assert worker._driver is None
+
+
+def test_main_window_initializes_session_controls(qtbot, monkeypatch, tmp_path):
+    monkeypatch.setattr(desktop, "user_data_dir", lambda *args: str(tmp_path))
+    monkeypatch.setattr(desktop, "load_providers", lambda _path: [])
+    window = desktop.MainWindow()
+    qtbot.addWidget(window)
+    assert window.active_sessions.count() == 0
+    assert not window.close_session_button.isEnabled()
+
+
+def test_duplicate_profile_detection():
+    window = desktop.MainWindow.__new__(desktop.MainWindow)
+    window._sessions = [(object(), object(), "qwen", "chromium")]
+    assert window._profile_is_open("qwen", "chromium")
+    assert not window._profile_is_open("qwen", "firefox")
+    assert not window._profile_is_open("claude", "chromium")
