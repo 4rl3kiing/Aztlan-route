@@ -29,7 +29,7 @@ Aztlan-route is a desktop-first, single-user application for Windows and Debian 
 8. The operator explicitly confirms successful sign-in. This is recorded as user-confirmed, not independently verified, and does not imply API/chat integration.
 9. The UI lists active sessions and allows each session to be closed independently.
 10. Application shutdown attempts to close every remaining session, even if another session reports a cleanup error.
-8. The browser profile persists for the next session.
+11. The browser profile persists for the next session.
 
 ### Documented adapter conversation
 
