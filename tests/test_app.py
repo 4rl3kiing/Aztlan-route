@@ -229,3 +229,21 @@ def test_worker_reauthentication_reopens_closed_tab(tmp_path):
 
     assert worker._page is worker._context.pages[0]
     assert worker._page.navigated == provider.url
+
+
+
+def test_worker_marks_closed_browser_context_for_recovery(tmp_path):
+    from aztlan_route.app import BrowserSessionWorker
+
+    provider = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+    worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+    received = []
+    worker.authentication_state.connect(lambda *args: received.append(args))
+
+    worker._on_context_closed()
+
+    assert worker._context_closed
+    assert received == [("manual", "chromium", "browser_session_closed")]
