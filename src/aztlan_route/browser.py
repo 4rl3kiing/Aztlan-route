@@ -55,6 +55,7 @@ def launch_provider(
         # A failed navigation must not strand a persistent context/profile lock.
         try:
             context.close()
-        finally:
-            raise
+        except Exception:
+            pass
+        raise
     return context
