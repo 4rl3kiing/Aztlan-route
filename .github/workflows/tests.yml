@@ -33,6 +33,10 @@ jobs:
         run: python -m compileall -q src tests
       - name: Run Ruff
         run: python -m ruff check src tests
+      - name: Audit Python dependencies
+        run: |
+          python -m pip install pip-audit
+          python -m pip_audit --strict
       - name: Validate Debian installer syntax
         if: runner.os == 'Linux'
         run: bash -n scripts/install-debian.sh scripts/uninstall-debian.sh
@@ -91,3 +95,5 @@ jobs:
         run: npm run build
       - name: Run router tests
         run: npm test
+      - name: Audit Node dependencies
+        run: npm audit --audit-level=high
