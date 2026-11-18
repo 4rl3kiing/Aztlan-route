@@ -88,10 +88,8 @@ class BrowserSessionWorker(QObject):
                 # Providers may open a dedicated challenge or callback tab after launch.
                 self._page = pages[-1]
                 url = self._page.url or ""
-                title = self._page.title()
                 state = detect_authentication_state(
                     url=url,
-                    title=title,
                     captcha_element_count=self._page.locator(
                         'iframe[src*="captcha" i], [id*="captcha" i], [class*="captcha" i]'
                     ).count(),
@@ -99,12 +97,6 @@ class BrowserSessionWorker(QObject):
                         'input[autocomplete="one-time-code"], input[name*="otp" i], '
                         'input[name*="verification-code" i]'
                     ).count(),
-                    login_form_detected=(
-                        self._page.locator('form:has(input[type="password"])').count() > 0
-                        and self._page.locator(
-                            'form:has(input[type="password"])'
-                        ).first.is_visible()
-                    ),
                 )
         except Exception:
             # A transient navigation or closed page must not terminate the browser session.
