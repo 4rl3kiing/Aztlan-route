@@ -11,9 +11,10 @@ Aztlan-route is a desktop-first, single-user application for Windows and Debian 
 3. **Browser runtime (Playwright):** persistent Firefox or Chromium contexts. Every provider/browser pair has its own profile path.
 4. **Session manager:** discovers profile directories without reading cookies, passwords, tokens or browser storage.
 5. **Adapter contract and registry:** only providers explicitly marked as approved documented integrations can register an automated adapter.
-6. **Model router:** dispatches to a registered adapter and rejects empty/oversized messages or unsupported providers.
-7. **Conversation store:** SQLite persistence for conversation metadata and message text. It never stores browser authentication state.
-8. **Local data boundary:** OS-specific application data directory, separate from source and install directories.
+6. **Provider connection manager:** derives conservative capability states from catalog policy, registered adapters and browser-session signals. It never equates web login with API access.
+7. **Model router:** dispatches to a registered adapter and rejects empty/oversized messages or unsupported providers.
+8. **Conversation store:** SQLite persistence for conversation metadata and message text. It never stores browser authentication state.
+9. **Local data boundary:** OS-specific application data directory, separate from source and install directories.
 
 ## Runtime flows
 
@@ -42,6 +43,10 @@ Aztlan-route is a desktop-first, single-user application for Windows and Debian 
 5. ConversationStore persists the user's message and adapter response when called by the conversation workflow.
 
 No provider adapter is enabled by default in this repository. The initial provider catalog is manual-browser only.
+
+### Centralized provider status
+
+The connection manager distinguishes disabled providers, manual-only browser access, pending manual authentication, user-confirmed web sessions, closed browser contexts, missing API adapters and registered API adapters. A registered adapter is only a local capability signal: remote reachability, credentials, quota and model availability require a separate documented health check. A browser login confirmation never changes a manual-browser provider into an API-capable provider.
 
 ## Debian
 
