@@ -70,3 +70,35 @@ See [docs/SECURITY.md](docs/SECURITY.md) and [docs/ARCHITECTURE.md](docs/ARCHITE
 ## License
 
 No license has been selected. All rights remain reserved by default; do not redistribute until a license is chosen.
+
+## Official API router (initial implementation)
+
+The API runtime is separate from the manual browser-session subsystem. It supports
+documented OpenAI-compatible HTTPS chat-completion endpoints, request/response JSON,
+and SSE streaming. The initial preset catalog contains Groq, Cerebras, Mistral and
+OpenRouter endpoints. Presets do not claim that a plan is free or that a model is
+available: the operator must select a current model ID and supply an API key.
+
+Configure credentials only as process environment variables; do not put keys in
+provider JSON, source control, conversation history or browser profiles:
+
+| Provider | API key variable | Model variable |
+| --- | --- | --- |
+| Groq | `GROQ_API_KEY` | `AZTLAN_GROQ_MODEL` |
+| Cerebras | `CEREBRAS_API_KEY` | `AZTLAN_CEREBRAS_MODEL` |
+| Mistral | `MISTRAL_API_KEY` | `AZTLAN_MISTRAL_MODEL` |
+| OpenRouter | `OPENROUTER_API_KEY` | `AZTLAN_OPENROUTER_MODEL` |
+
+Only entries with both variables configured are activated. The router orders active
+providers by catalog priority, uses a per-provider circuit breaker, retries another
+provider only for transient network/rate-limit/server errors, and exposes bounded
+local p50/p95 latency and success metrics. Authentication/configuration errors are
+not silently retried. Streaming fallback is allowed only before the first event;
+after output begins, a stream failure is surfaced rather than splicing two model
+responses together.
+
+This initial runtime is a backend extension point; it does not yet add a chat-completion
+HTTP server or connect the desktop chat UI. It does not include Google AI Studio's
+native Gemini protocol, local inference endpoints, web-session scraping, cookie reuse,
+CAPTCHA solving, anti-bot evasion, or quota circumvention. Provider quotas and free
+tiers are subject to each provider's current terms and account limits.

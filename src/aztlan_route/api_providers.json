@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "providers": [
+    {
+      "id": "groq",
+      "name": "Groq",
+      "base_url": "https://api.groq.com/openai/v1",
+      "api_key_env": "GROQ_API_KEY",
+      "model_env": "AZTLAN_GROQ_MODEL",
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "id": "cerebras",
+      "name": "Cerebras",
+      "base_url": "https://api.cerebras.ai/v1",
+      "api_key_env": "CEREBRAS_API_KEY",
+      "model_env": "AZTLAN_CEREBRAS_MODEL",
+      "priority": 20,
+      "enabled": true
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral",
+      "base_url": "https://api.mistral.ai/v1",
+      "api_key_env": "MISTRAL_API_KEY",
+      "model_env": "AZTLAN_MISTRAL_MODEL",
+      "priority": 30,
+      "enabled": true
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "model_env": "AZTLAN_OPENROUTER_MODEL",
+      "priority": 40,
+      "enabled": true
+    }
+  ]
+}

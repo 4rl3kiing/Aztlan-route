@@ -64,3 +64,23 @@ The Debian installer creates a private virtual environment, installs Playwright 
 ## Non-goals
 
 CAPTCHA solving, fingerprint spoofing, proxy rotation to evade quotas, paywall bypass, hidden endpoint reverse engineering, cookie extraction, and automated use contrary to provider terms are out of scope.
+
+## Official API router extension
+
+The independent `api_runtime` module provides:
+- a validated HTTPS endpoint catalog with no embedded credentials;
+- OpenAI-compatible `/chat/completions` requests and SSE event forwarding;
+- explicit model selection per provider via environment configuration;
+- per-provider circuit breakers and bounded local latency/success telemetry;
+- fallback on transient transport, rate-limit and server errors only.
+
+API credentials are read from the process environment for each request and are not
+written to SQLite, browser profiles, logs or catalog files. A confirmed browser login
+is not accepted as an API key or authorization mechanism. Model IDs are operator
+configured because availability and naming change over time.
+
+The first implementation is backend-only. The next integration stage is to connect
+this router to the desktop conversation workflow and add an explicit settings UI for
+provider order, model IDs and secret storage using an OS credential vault. Streaming
+fallback is deliberately prohibited after the first event to avoid mixing partial
+answers from different providers.
