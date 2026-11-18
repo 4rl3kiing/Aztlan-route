@@ -312,11 +312,21 @@ class MainWindow(QMainWindow):
 
     def refresh_connection_statuses(self) -> None:
         self.connection_status_list.clear()
-        session_states = {
-            provider_id: state
-            for key, state in self._auth_states.items()
-            for provider_id, _browser in [key.split(":", 1)]
+        session_states = {}
+        state_priority = {
+            "authenticated_user_confirmed": 4,
+            "captcha_required": 3,
+            "mfa_required": 3,
+            "reauthentication_required": 3,
+            "awaiting_user": 3,
+            "browser_page_closed": 1,
+            "browser_session_closed": 1,
         }
+        for key, state in self._auth_states.items():
+            provider_id, _browser = key.split(":", 1)
+            current = session_states.get(provider_id)
+            if current is None or state_priority.get(state, 0) > state_priority.get(current, 0):
+                session_states[provider_id] = state
         labels = {
             "disabled": "Deshabilitado",
             "manual_only": "Sólo navegación manual",
