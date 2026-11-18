@@ -319,3 +319,34 @@ def test_worker_detects_closed_last_browser_tab(tmp_path):
     worker._inspect_authentication_challenge()
 
     assert received == [("manual", "chromium", "browser_page_closed")]
+
+
+
+def test_worker_reauthentication_failure_keeps_session_open(tmp_path):
+    from aztlan_route.app import BrowserSessionWorker
+
+    provider = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+
+    class Page:
+        def bring_to_front(self):
+            raise RuntimeError("page is not available")
+
+    class Context:
+        pages = [Page()]
+
+    worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+    worker._context = Context()
+    worker._driver = object()
+    failed = []
+    closed = []
+    worker.failed.connect(failed.append)
+    worker.closed.connect(lambda: closed.append(True))
+
+    worker.request_reauthentication()
+
+    assert failed and "No se pudo reabrir" in failed[0]
+    assert closed == []
+    assert worker._context is not None
