@@ -47,8 +47,8 @@ def launch_provider(
         headless=headless,
         args=["--no-first-run"] if browser == "chromium" else [],
     )
-    context.set_default_timeout(15_000)
     try:
+        context.set_default_timeout(15_000)
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(provider.url, wait_until="domcontentloaded")
     except Exception:
