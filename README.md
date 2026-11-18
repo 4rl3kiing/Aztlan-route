@@ -22,9 +22,13 @@ Aztlan-route is a local-first desktop application for organizing access to AI pr
 - Failed page navigation triggers context cleanup to release profile locks.
 - Provider catalog validation and adapter contract.
 - Deterministic router for approved documented adapters.
+- Central provider connection manager with explicit manual-session, API-adapter, authentication-required and unavailable states.
+- Desktop capability panel that distinguishes a user-confirmed web session from programmatic API readiness.
 - Local conversation persistence and profile discovery.
 - Debian installer and desktop launcher with preservation of local user data.
 - Unit tests plus a CI smoke job that launches real Chromium and Firefox persistent contexts.
+
+The connection panel reports `manual_browser` providers as manual-only, authentication-required, browser-unavailable or user-confirmed web sessions. A user-confirmed browser session is never represented as API connectivity. A `documented_api` provider is reported as adapter-ready only when an approved adapter is registered; this state still does not prove remote service health. No API keys or credentials are collected or stored by the connection manager.
 
 The current provider catalog uses `manual_browser`. These entries open official websites but do not automate chat submission or scrape responses. During sign-in, Aztlan-route keeps the browser open and periodically checks only the page URL, title and common visible CAPTCHA/MFA elements. The user completes every challenge directly with the provider and explicitly confirms successful sign-in in the desktop UI. Challenge detection is heuristic; absence of a challenge is never treated as proof of authentication. The confirmation records the operator's statement only and does not establish API access. If the provider returns to a recognizable sign-in page or the browser tab is closed, the UI reports the state and offers to reopen the official provider page in the same profile for manual reauthentication. No production provider API adapter is enabled until its documented interface and permitted use have been reviewed.
 
