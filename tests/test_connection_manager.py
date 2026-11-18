@@ -9,8 +9,10 @@ from aztlan_route.providers import Provider
 
 
 def provider(mode="manual_browser", automation=False):
-    return Provider("sample", "Sample", "https://example.com", ("chromium",),
-                    mode, automation, "test")
+    return Provider(
+        "sample", "Sample", "https://example.com", ("chromium",),
+        mode, automation, "test",
+    )
 
 
 def test_manual_provider_without_session_is_manual_only():
@@ -74,3 +76,23 @@ def test_unknown_provider_is_rejected():
     manager = ProviderConnectionManager([provider()])
     with pytest.raises(KeyError, match="Unknown provider"):
         manager.get_status("missing")
+
+
+def test_snapshot_preserves_each_browser_session_state():
+    manager = ProviderConnectionManager([provider()])
+    statuses = manager.snapshot({
+        "sample:chromium": "mfa_required",
+        "sample:firefox": "authenticated_user_confirmed",
+    })
+    assert [(item.browser, item.state) for item in statuses] == [
+        ("chromium", ConnectionState.AUTHENTICATION_REQUIRED),
+        ("firefox", ConnectionState.WEB_SESSION_CONFIRMED),
+    ]
+
+
+def test_snapshot_reports_catalog_state_when_no_browser_session_exists():
+    manager = ProviderConnectionManager([provider()])
+    statuses = manager.snapshot()
+    assert len(statuses) == 1
+    assert statuses[0].browser is None
+    assert statuses[0].state is ConnectionState.MANUAL_ONLY
