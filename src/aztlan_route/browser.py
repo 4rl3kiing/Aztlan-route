@@ -48,6 +48,13 @@ def launch_provider(
         args=["--no-first-run"] if browser == "chromium" else [],
     )
     context.set_default_timeout(15_000)
-    page = context.pages[0] if context.pages else context.new_page()
-    page.goto(provider.url, wait_until="domcontentloaded")
+    try:
+        page = context.pages[0] if context.pages else context.new_page()
+        page.goto(provider.url, wait_until="domcontentloaded")
+    except Exception:
+        # A failed navigation must not strand a persistent context/profile lock.
+        try:
+            context.close()
+        finally:
+            raise
     return context
