@@ -24,12 +24,14 @@ Aztlan-route is a desktop-first, single-user application for Windows and Debian 
 3. Runtime rejects a second launch for an already-open provider/browser profile.
 4. A dedicated Qt worker thread creates a provider-specific profile directory with restrictive POSIX permissions.
 5. Browser opens the provider's official website; failed navigation closes the partially-created context.
-6. A worker-thread timer checks the active page URL, title and common visible CAPTCHA/MFA elements; it does not read page body text or authentication storage.
+6. A worker-thread timer checks the active page URL, title, common visible CAPTCHA/MFA elements and the presence of a password form; it does not read page body text or authentication storage.
 7. CAPTCHA and MFA remain user-operated on the provider website. The UI reports detected challenges and waits without blocking the Qt event loop.
 8. The operator explicitly confirms successful sign-in. This is recorded as user-confirmed, not independently verified, and does not imply API/chat integration.
-9. The UI lists active sessions and allows each session to be closed independently.
-10. Application shutdown attempts to close every remaining session, even if another session reports a cleanup error.
-11. The browser profile persists for the next session.
+9. Monitoring continues after confirmation. A recognizable sign-in route or password form changes the state to reauthentication-required; a closed final tab is reported separately.
+10. Reauthentication brings the existing provider tab forward or reopens the provider's official URL in the same persistent profile. The user completes sign-in manually.
+11. The UI lists active sessions and allows each session to be closed independently.
+12. Application shutdown attempts to close every remaining session, even if another session reports a cleanup error.
+13. The browser profile persists for the next session.
 
 ### Documented adapter conversation
 
