@@ -7,12 +7,16 @@ Provider authentication state and browser cookies, local browser profiles, user 
 ## Controls in this scaffold
 
 - HTTPS-only provider destinations.
-- Strict provider ID validation to prevent path traversal.
+- Shared strict provider ID validation (ASCII, 1-64 characters) across catalog, browser profiles and conversation storage.
+- Provider catalog type validation; automation flags must be real booleans and browser lists are normalized before use.
+- Disabled providers are excluded from the UI and rejected by the browser launcher.
 - Separate persistent profile directory per provider and browser.
-- POSIX profile directories created with mode 0700.
+- POSIX profile directories and SQLite parent directory restricted to mode 0700; SQLite database restricted to mode 0600.
+- SQLite connections are closed deterministically after each operation.
 - No cookie, password, token or browser storage export.
 - No secrets in provider catalog, source code or logs.
 - No provider page DOM scraping or chat automation.
+- Playwright runs on dedicated Qt worker threads; each session is closed independently during application shutdown.
 
 ## Required before production
 
