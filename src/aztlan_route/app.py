@@ -152,10 +152,18 @@ class MainWindow(QMainWindow):
         if not profiles:
             self.profile_list.addItem("No hay perfiles creados todavía.")
 
-    def _remove_session_thread(self, thread: QThread) -> None:
+    @Slot()
+    def _on_thread_finished(self) -> None:
+        thread = self.sender()
+        if not isinstance(thread, QThread):
+            return
         self._sessions = [item for item in self._sessions if item[0] is not thread]
         thread.deleteLater()
         self.launch_button.setEnabled(bool(self._visible_providers))
+
+    @Slot(str)
+    def _show_browser_error(self, message: str) -> None:
+        QMessageBox.critical(self, "No se pudo abrir/cerrar el navegador", message)
 
     def open_provider(self) -> None:
         index = self.provider_list.currentRow()
@@ -171,14 +179,10 @@ class MainWindow(QMainWindow):
         worker.moveToThread(thread)
         thread.started.connect(worker.start)
         worker.opened.connect(self._on_session_opened)
-        worker.failed.connect(
-            lambda message: QMessageBox.critical(
-                self, "No se pudo abrir/cerrar el navegador", message
-            )
-        )
+        worker.failed.connect(self._show_browser_error)
         worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(lambda: self._remove_session_thread(thread))
+        thread.finished.connect(self._on_thread_finished)
         self._sessions.append((thread, worker))
         thread.start()
 
