@@ -39,7 +39,7 @@ Python 3.11+:
 
 ```powershell
 py -3.11 -m venv .venv
-.venv\\Scripts\\activate
+.venv\Scripts\activate
 python -m pip install -e ".[dev]"
 python -m playwright install chromium firefox
 aztlan-route
@@ -50,6 +50,7 @@ aztlan-route
 ```bash
 python -m pip install -e ".[dev]"
 python -m compileall -q src tests
+python -m ruff check src tests
 python -m pytest
 ```
 
@@ -59,4 +60,4 @@ See [docs/SECURITY.md](docs/SECURITY.md) and [docs/ARCHITECTURE.md](docs/ARCHITE
 
 ## License
 
-License not yet selected.
+No license has been selected. All rights remain reserved by default; do not redistribute until a license is chosen.
