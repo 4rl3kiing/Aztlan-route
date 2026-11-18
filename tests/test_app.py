@@ -78,3 +78,76 @@ def test_duplicate_profile_detection():
     assert desktop.MainWindow._profile_is_open(state, "qwen", "chromium")
     assert not desktop.MainWindow._profile_is_open(state, "qwen", "firefox")
     assert not desktop.MainWindow._profile_is_open(state, "claude", "chromium")
+
+
+def test_browser_worker_start_and_close_releases_all_resources(monkeypatch, tmp_path):
+    from aztlan_route.app import BrowserSessionWorker
+
+    provider = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+
+    class Context:
+        closed = False
+
+        def close(self):
+            self.closed = True
+
+    class Driver:
+        stopped = False
+
+        def stop(self):
+            self.stopped = True
+
+    context = Context()
+    driver = Driver()
+
+    class PlaywrightStarter:
+        def start(self):
+            return driver
+
+    monkeypatch.setattr(desktop, "sync_playwright", lambda: PlaywrightStarter())
+    monkeypatch.setattr(desktop, "launch_provider", lambda *_args: context)
+
+    worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+    worker.start()
+    assert worker._context is context
+    assert worker._driver is driver
+    worker.close()
+    assert context.closed
+    assert driver.stopped
+    assert worker._context is None
+    assert worker._driver is None
+
+
+def test_browser_worker_releases_driver_when_launch_fails(monkeypatch, tmp_path):
+    from aztlan_route.app import BrowserSessionWorker
+
+    provider = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+
+    class Driver:
+        stopped = False
+
+        def stop(self):
+            self.stopped = True
+
+    driver = Driver()
+
+    class PlaywrightStarter:
+        def start(self):
+            return driver
+
+    monkeypatch.setattr(desktop, "sync_playwright", lambda: PlaywrightStarter())
+
+    def fail_launch(*_args):
+        raise RuntimeError("browser launch failed")
+
+    monkeypatch.setattr(desktop, "launch_provider", fail_launch)
+    worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+    worker.start()
+    assert driver.stopped
+    assert worker._driver is None
