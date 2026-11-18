@@ -17,7 +17,8 @@ Aztlan-route is a local-first desktop application for organizing access to AI pr
 - Persistent Chromium and Firefox profiles, each isolated by provider/browser.
 - Playwright runs on dedicated Qt worker threads rather than blocking the UI thread.
 - Active browser-session list, individual session closure and duplicate-profile launch prevention.
-- Non-blocking authentication wait state per browser session, with conservative CAPTCHA/MFA challenge indicators and explicit operator confirmation.
+- Non-blocking authentication wait state per browser session, with conservative CAPTCHA/MFA and expired-login indicators.
+- Periodic session-state checks, closed-tab detection and reauthentication using the same persistent browser profile.
 - Failed page navigation triggers context cleanup to release profile locks.
 - Provider catalog validation and adapter contract.
 - Deterministic router for approved documented adapters.
@@ -25,7 +26,7 @@ Aztlan-route is a local-first desktop application for organizing access to AI pr
 - Debian installer and desktop launcher with preservation of local user data.
 - Unit tests plus a CI smoke job that launches real Chromium and Firefox persistent contexts.
 
-The current provider catalog uses `manual_browser`. These entries open official websites but do not automate chat submission or scrape responses. During sign-in, Aztlan-route keeps the browser open and periodically checks only the page URL, title and common visible CAPTCHA/MFA elements. The user completes every challenge directly with the provider and explicitly confirms successful sign-in in the desktop UI. Challenge detection is heuristic; absence of a challenge is never treated as proof of authentication. The confirmation records the operator's statement only and does not establish API access. No production provider API adapter is enabled until its documented interface and permitted use have been reviewed.
+The current provider catalog uses `manual_browser`. These entries open official websites but do not automate chat submission or scrape responses. During sign-in, Aztlan-route keeps the browser open and periodically checks only the page URL, title and common visible CAPTCHA/MFA elements. The user completes every challenge directly with the provider and explicitly confirms successful sign-in in the desktop UI. Challenge detection is heuristic; absence of a challenge is never treated as proof of authentication. The confirmation records the operator's statement only and does not establish API access. If the provider returns to a recognizable sign-in page or the browser tab is closed, the UI reports the state and offers to reopen the official provider page in the same profile for manual reauthentication. No production provider API adapter is enabled until its documented interface and permitted use have been reviewed.
 
 ## Debian installation
 
