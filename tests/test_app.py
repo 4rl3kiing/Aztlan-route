@@ -28,3 +28,35 @@ def test_main_window_hides_disabled_providers(qtbot, monkeypatch, tmp_path):
     assert window.provider_list.count() == 1
     assert window.provider_list.item(0).text().startswith("Manual")
     assert window.launch_button.isEnabled()
+
+
+def test_worker_closes_driver_even_if_context_close_fails(tmp_path):
+    from aztlan_route.app import BrowserSessionWorker
+
+    provider = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+    worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+
+    class BrokenContext:
+        def close(self):
+            raise RuntimeError("context close failed")
+
+    class Driver:
+        stopped = False
+
+        def stop(self):
+            self.stopped = True
+
+    driver = Driver()
+    worker._context = BrokenContext()
+    worker._driver = driver
+
+    import pytest
+
+    with pytest.raises(RuntimeError, match="context close failed"):
+        worker._stop_resources()
+    assert driver.stopped
+    assert worker._context is None
+    assert worker._driver is None
