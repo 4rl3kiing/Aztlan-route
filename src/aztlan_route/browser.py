@@ -1,7 +1,9 @@
 """Launch isolated, persistent provider browser profiles."""
 from __future__ import annotations
 
+import getpass
 import os
+import subprocess
 from pathlib import Path
 
 from playwright.sync_api import BrowserContext, Playwright
@@ -17,11 +19,30 @@ def profile_path(root: Path, provider_id: str, browser: str) -> Path:
     return root / provider_id / browser
 
 
+def _apply_windows_acl(path: Path) -> None:
+    """Disable inherited ACLs and grant access only to the current user and SYSTEM."""
+    username = getpass.getuser()
+    if not username or any(char in username for char in '\\\"\n\r'):
+        raise RuntimeError("Cannot safely determine the current Windows account")
+    subprocess.run(
+        [
+            "icacls", str(path), "/inheritance:r", "/grant:r",
+            f"{username}:(OI)(CI)F", "SYSTEM:(OI)(CI)F",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+
+
 def _secure_directory(path: Path) -> None:
     for directory in (path.parents[1], path.parent, path):
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         if os.name == "posix":
             directory.chmod(0o700)
+        elif os.name == "nt":
+            _apply_windows_acl(directory)
 
 
 def launch_provider(
