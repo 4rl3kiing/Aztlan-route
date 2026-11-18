@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .identifiers import validate_identifier
 from .providers import SUPPORTED_BROWSERS
 
 
@@ -23,7 +24,11 @@ class SessionManager:
         if not self.profiles_root.is_dir():
             return profiles
         for provider_dir in self.profiles_root.iterdir():
-            if not provider_dir.is_dir() or not provider_dir.name.replace("-", "").isalnum():
+            if not provider_dir.is_dir():
+                continue
+            try:
+                validate_identifier(provider_dir.name, label="provider id")
+            except ValueError:
                 continue
             for browser_dir in provider_dir.iterdir():
                 if browser_dir.is_dir() and browser_dir.name in SUPPORTED_BROWSERS:
