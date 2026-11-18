@@ -61,3 +61,8 @@ def test_challenge_state_takes_precedence_over_reauthentication():
         title="Sign in",
         captcha_element_count=1,
     ) == "captcha_required"
+
+
+
+def test_invalid_url_for_state_detector_is_ignored():
+    assert detect_authentication_state(url=None, title="Login") is None
