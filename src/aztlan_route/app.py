@@ -38,6 +38,7 @@ class BrowserSessionWorker(QObject):
         self._page = None
         self._auth_timer = None
         self._authentication_status = "awaiting_user"
+        self._context_closed = False
 
     @Slot()
     def start(self) -> None:
@@ -46,6 +47,9 @@ class BrowserSessionWorker(QObject):
             self._context = launch_provider(
                 self._driver, self.provider, self.browser, self.profile_root
             )
+            self._context_closed = False
+            if hasattr(self._context, "on"):
+                self._context.on("close", self._on_context_closed)
             pages = getattr(self._context, "pages", [])
             self._page = pages[0] if pages else None
             self._auth_timer = QTimer(self)
@@ -61,6 +65,13 @@ class BrowserSessionWorker(QObject):
             self.failed.emit(str(exc))
             return
         self.opened.emit()
+
+    def _on_context_closed(self, *_args) -> None:
+        self._context_closed = True
+        self._authentication_status = "browser_session_closed"
+        self.authentication_state.emit(
+            self.provider.id, self.browser, self._authentication_status
+        )
 
     @Slot()
     def _inspect_authentication_challenge(self) -> None:
@@ -108,9 +119,16 @@ class BrowserSessionWorker(QObject):
     @Slot()
     def request_reauthentication(self) -> None:
         """Bring the existing provider profile forward or reopen its official start page."""
-        if self._context is None:
+        if self._context is None or self._driver is None:
             return
         try:
+            if self._context_closed:
+                self._context = launch_provider(
+                    self._driver, self.provider, self.browser, self.profile_root
+                )
+                self._context_closed = False
+                if hasattr(self._context, "on"):
+                    self._context.on("close", self._on_context_closed)
             pages = self._context.pages
             if pages:
                 self._page = pages[-1]
@@ -270,6 +288,7 @@ class MainWindow(QMainWindow):
             "authenticated_user_confirmed": "confirmada por el usuario (no verifica acceso API)",
             "reauthentication_required": "sesión expirada o inicio de sesión requerido",
             "browser_page_closed": "pestaña cerrada; se puede reabrir el proveedor",
+            "browser_session_closed": "navegador cerrado; se puede recuperar la sesión",
         }
         return labels.get(state, "estado desconocido")
 
