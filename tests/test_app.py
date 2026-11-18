@@ -151,3 +151,20 @@ def test_browser_worker_releases_driver_when_launch_fails(monkeypatch, tmp_path)
     worker.start()
     assert driver.stopped
     assert worker._driver is None
+
+
+
+def test_worker_confirmation_emits_explicit_user_confirmed_state(tmp_path):
+    from aztlan_route.app import BrowserSessionWorker
+
+    provider = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+    worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+    received = []
+    worker.authentication_state.connect(lambda *args: received.append(args))
+
+    worker.confirm_authenticated()
+
+    assert received == [("manual", "chromium", "authenticated_user_confirmed")]
