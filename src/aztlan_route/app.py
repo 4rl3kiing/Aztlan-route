@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from platformdirs import user_data_dir
+from PySide6.QtCore import QMetaObject, QObject, QThread, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QLabel, QListWidget, QMainWindow,
     QMessageBox, QPushButton, QVBoxLayout, QWidget,
@@ -14,8 +15,56 @@ from playwright.sync_api import Error as PlaywrightError, sync_playwright
 from . import __version__
 from .browser import launch_provider
 from .conversations import ConversationStore
-from .providers import load_providers
+from .providers import Provider, load_providers
 from .sessions import SessionManager
+
+
+class BrowserSessionWorker(QObject):
+    """Owns Playwright and its browser context entirely on a dedicated Qt thread."""
+
+    opened = Signal()
+    failed = Signal(str)
+    closed = Signal()
+
+    def __init__(self, provider: Provider, browser: str, profile_root: Path) -> None:
+        super().__init__()
+        self.provider = provider
+        self.browser = browser
+        self.profile_root = profile_root
+        self._driver = None
+        self._context = None
+
+    @Slot()
+    def start(self) -> None:
+        try:
+            self._driver = sync_playwright().start()
+            self._context = launch_provider(
+                self._driver, self.provider, self.browser, self.profile_root
+            )
+        except (PlaywrightError, OSError, ValueError, RuntimeError) as exc:
+            self._stop_resources()
+            self.failed.emit(str(exc))
+            return
+        self.opened.emit()
+
+    def _stop_resources(self) -> None:
+        try:
+            if self._context is not None:
+                self._context.close()
+        finally:
+            self._context = None
+            if self._driver is not None:
+                self._driver.stop()
+                self._driver = None
+
+    @Slot()
+    def close(self) -> None:
+        try:
+            self._stop_resources()
+        except Exception as exc:
+            self.failed.emit(f"Error cerrando sesión: {exc}")
+        finally:
+            self.closed.emit()
 
 
 class MainWindow(QMainWindow):
@@ -28,7 +77,7 @@ class MainWindow(QMainWindow):
         self.profile_root = self.data_root / "profiles"
         catalog = Path(__file__).with_name("providers.json")
         self.providers = load_providers(catalog)
-        self._sessions = []
+        self._sessions: list[tuple[QThread, BrowserSessionWorker]] = []
         self.conversations = ConversationStore(self.data_root / "conversations.sqlite3")
         self.session_manager = SessionManager(self.profile_root)
 
@@ -36,10 +85,20 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(central)
         layout.addWidget(QLabel("Proveedores disponibles"))
         self.provider_list = QListWidget()
-        for provider in self.providers:
-            mode = "Navegación manual" if provider.integration_mode == "manual_browser" else provider.integration_mode
+        self._visible_providers = [
+            provider for provider in self.providers if provider.integration_mode != "disabled"
+        ]
+        for provider in self._visible_providers:
+            mode = (
+                "Navegación manual"
+                if provider.integration_mode == "manual_browser"
+                else provider.integration_mode
+            )
             self.provider_list.addItem(f"{provider.name} — {mode}")
-        self.provider_list.setCurrentRow(0)
+        if self._visible_providers:
+            self.provider_list.setCurrentRow(0)
+        else:
+            self.provider_list.addItem("No hay proveedores habilitados.")
         layout.addWidget(self.provider_list)
 
         layout.addWidget(QLabel("Navegador"))
@@ -49,6 +108,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.browser_choice)
 
         self.launch_button = QPushButton("Abrir sesión del proveedor")
+        self.launch_button.setEnabled(bool(self._visible_providers))
         self.launch_button.clicked.connect(self.open_provider)
         layout.addWidget(self.launch_button)
 
@@ -75,36 +135,46 @@ class MainWindow(QMainWindow):
         if not profiles:
             self.profile_list.addItem("No hay perfiles creados todavía.")
 
+    def _remove_session_thread(self, thread: QThread) -> None:
+        self._sessions = [item for item in self._sessions if item[0] is not thread]
+        thread.deleteLater()
+        self.launch_button.setEnabled(bool(self._visible_providers))
+
     def open_provider(self) -> None:
         index = self.provider_list.currentRow()
-        if index < 0:
-            QMessageBox.warning(self, "Aztlan-route", "Selecciona un proveedor.")
+        if index < 0 or index >= len(self._visible_providers):
+            QMessageBox.warning(self, "Aztlan-route", "Selecciona un proveedor habilitado.")
             return
 
-        provider = self.providers[index]
+        provider = self._visible_providers[index]
         browser = self.browser_choice.currentData()
         self.launch_button.setEnabled(False)
-        driver = None
-        try:
-            driver = sync_playwright().start()
-            context = launch_provider(
-                driver, provider, browser, self.profile_root
+        thread = QThread(self)
+        worker = BrowserSessionWorker(provider, browser, self.profile_root)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.start)
+        worker.opened.connect(self.refresh_profiles)
+        worker.failed.connect(
+            lambda message: QMessageBox.critical(
+                self, "No se pudo abrir/cerrar el navegador", message
             )
-            self._sessions.append((driver, context))
-            self.refresh_profiles()
-        except (PlaywrightError, OSError, ValueError) as exc:
-            if driver is not None:
-                driver.stop()
-            QMessageBox.critical(self, "No se pudo abrir el navegador", str(exc))
-        finally:
-            self.launch_button.setEnabled(True)
+        )
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(lambda: self._remove_session_thread(thread))
+        self._sessions.append((thread, worker))
+        thread.start()
 
     def closeEvent(self, event) -> None:
-        for driver, context in reversed(self._sessions):
-            try:
-                context.close()
-            finally:
-                driver.stop()
+        for thread, worker in reversed(self._sessions[:]):
+            if thread.isRunning():
+                try:
+                    QMetaObject.invokeMethod(
+                        worker, "close", Qt.ConnectionType.BlockingQueuedConnection
+                    )
+                except RuntimeError:
+                    pass
+                thread.quit()
+                thread.wait()
         self._sessions.clear()
         super().closeEvent(event)
 
