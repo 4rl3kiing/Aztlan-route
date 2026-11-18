@@ -16,22 +16,21 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 sudo apt-get update
 sudo apt-get install -y \
   "${PYTHON_BIN}" "${PYTHON_BIN}-venv" "${PYTHON_BIN}-pip" \
-  ca-certificates curl libglib2.0-0 libnss3 libnspr4 libatk1.0-0 \
+  ca-certificates libglib2.0-0 libnss3 libnspr4 libatk1.0-0 \
   libatk-bridge2.0-0 libatspi2.0-0 libx11-6 libxcomposite1 \
   libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libxcb1 \
   libxkbcommon0 libasound2
 
 APP_DIR="${HOME}/.local/opt/aztlan-route"
-DATA_DIR="${HOME}/.local/share/aztlan-route"
-mkdir -p "${APP_DIR}" "${DATA_DIR}" "${HOME}/.local/bin" "${HOME}/.local/share/applications"
+mkdir -p "${APP_DIR}" "${HOME}/.local/bin" "${HOME}/.local/share/applications"
 cp -a "${ROOT_DIR}/." "${APP_DIR}/"
 
 "${PYTHON_BIN}" -m venv "${APP_DIR}/.venv"
 "${APP_DIR}/.venv/bin/python" -m pip install --upgrade pip
 "${APP_DIR}/.venv/bin/python" -m pip install "${APP_DIR}"
 
-# Install both browser engines and their Debian runtime libraries.
-"${APP_DIR}/.venv/bin/python" -m playwright install-deps chromium firefox
+# Install required shared libraries with elevated privileges, then browsers as the user.
+sudo "${APP_DIR}/.venv/bin/python" -m playwright install-deps chromium firefox
 "${APP_DIR}/.venv/bin/python" -m playwright install chromium firefox
 
 cat > "${HOME}/.local/bin/aztlan-route" <<EOF
