@@ -3,7 +3,7 @@ set -Eeuo pipefail
 APP_DIR="${HOME}/.local/opt/aztlan-route"
 BIN_FILE="${HOME}/.local/bin/aztlan-route"
 DESKTOP_FILE="${HOME}/.local/share/applications/aztlan-route.desktop"
-DATA_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/Aztlan/Aztlan-route"
+DATA_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/Aztlan-route"
 
 rm -rf -- "$APP_DIR"
 rm -f -- "$BIN_FILE" "$DESKTOP_FILE"
