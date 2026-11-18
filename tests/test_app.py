@@ -69,6 +69,7 @@ def test_main_window_initializes_session_controls(qtbot, monkeypatch, tmp_path):
     qtbot.addWidget(window)
     assert window.active_sessions.count() == 0
     assert not window.close_session_button.isEnabled()
+    assert not window.reauthenticate_button.isEnabled()
 
 
 def test_duplicate_profile_detection():
@@ -247,3 +248,74 @@ def test_worker_marks_closed_browser_context_for_recovery(tmp_path):
 
     assert worker._context_closed
     assert received == [("manual", "chromium", "browser_session_closed")]
+
+
+
+def test_worker_detects_expired_login_after_user_confirmation(tmp_path):
+    from aztlan_route.app import BrowserSessionWorker
+
+    provider = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+
+    class Locator:
+        def __init__(self, count):
+            self._count = count
+
+        def count(self):
+            return self._count
+
+        @property
+        def first(self):
+            return self
+
+        def is_visible(self):
+            return True
+
+    class Page:
+        url = "https://example.org/login"
+
+        def title(self):
+            return "Sign in"
+
+        def locator(self, selector):
+            if "captcha" in selector:
+                return Locator(0)
+            if "one-time-code" in selector:
+                return Locator(0)
+            return Locator(1)
+
+    class Context:
+        pages = [Page()]
+
+    worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+    worker._context = Context()
+    worker._authentication_status = "authenticated_user_confirmed"
+    received = []
+    worker.authentication_state.connect(lambda *args: received.append(args))
+
+    worker._inspect_authentication_challenge()
+
+    assert received == [("manual", "chromium", "reauthentication_required")]
+
+
+def test_worker_detects_closed_last_browser_tab(tmp_path):
+    from aztlan_route.app import BrowserSessionWorker
+
+    provider = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+
+    class Context:
+        pages = []
+
+    worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+    worker._context = Context()
+    received = []
+    worker.authentication_state.connect(lambda *args: received.append(args))
+
+    worker._inspect_authentication_challenge()
+
+    assert received == [("manual", "chromium", "browser_page_closed")]
