@@ -40,6 +40,18 @@ def test_catalog_loads_official_api_presets():
     assert [item.id for item in providers] == ["groq", "cerebras", "mistral", "openrouter"]
 
 
+def test_build_activates_only_providers_with_key_and_model():
+    provider = config()
+    assert build_configured_adapters(
+        [provider], environ={"TEST_API_KEY": "secret"}
+    ) == []
+    adapters = build_configured_adapters(
+        [provider], environ={"TEST_API_KEY": "secret", "TEST_MODEL": "model-a"}
+    )
+    assert len(adapters) == 1
+    assert adapters[0].model == "model-a"
+
+
 def test_catalog_rejects_non_https_and_url_credentials():
     with pytest.raises(ValueError, match="HTTPS"):
         config_obj = ApiProviderConfig(
