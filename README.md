@@ -4,40 +4,54 @@ Aztlan-route is a local-first desktop application for organizing access to AI pr
 
 ## Selected architecture
 
-- Desktop application; browser profiles and session data remain on the user's device.
-- Supports Firefox and Chromium through Playwright, with an explicit browser choice per launch.
-- Provider adapters are isolated behind a small registry. A provider is not marked automation-compatible unless its published terms and supported integration path have been reviewed.
-- Authentication is performed by the user in the provider's own website. The application does not collect passwords, export cookies, inspect private page internals, or bypass CAPTCHA, paywalls, quotas, or anti-automation controls.
-- Persistent browser profiles are isolated by provider and protected by operating-system file permissions. OS credential storage is reserved for future application secrets; raw cookies are never copied into application configuration or logs.
+- Desktop application for Windows and Debian Linux.
+- Firefox and Chromium through Playwright, with a separate persistent profile for each provider/browser pair.
+- Provider catalog with explicit integration modes.
+- Adapter registry and router that reject providers without a reviewed, documented integration.
+- Local SQLite conversation history; browser authentication material is not copied into this database.
+- User authentication takes place on the provider's official website. No password collection, cookie export, CAPTCHA bypass, paywall bypass, quota evasion, or anti-automation circumvention.
 
-## Current implementation scope
+## Implemented
 
-This initial scaffold provides:
-- a desktop UI shell;
-- a provider catalog with compatibility status;
-- launch of an isolated Firefox or Chromium persistent browser profile at the provider's official website;
-- local profile-directory permissions on POSIX systems;
-- tests for provider validation and profile path isolation.
+- PySide6 desktop shell and provider selection.
+- Persistent Chromium and Firefox profile launch.
+- Provider catalog validation and adapter contract.
+- Deterministic router for approved documented adapters.
+- Local conversation persistence and profile discovery.
+- Debian installer and desktop launcher.
+- Pytest suite and GitHub Actions checks.
 
-It does **not** automate chat submission or scrape provider responses. Those capabilities require a documented, permitted integration path for each provider.
+The current provider catalog uses `manual_browser`. These entries open official websites but do not automate chat submission or scrape responses. No production provider API adapter is enabled until its documented interface and permitted use have been reviewed.
 
-## Development
+## Debian installation
 
-Python 3.11+ is required.
+On Debian 12 or newer:
 
 ```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -e '.[dev]'
-playwright install chromium firefox
+bash scripts/install-debian.sh
+```
+
+See [Debian deployment notes](debian/README.md).
+
+## Windows / development installation
+
+Python 3.11+:
+
+```powershell
+py -3.11 -m venv .venv
+.venv\\Scripts\\activate
+python -m pip install -e ".[dev]"
+python -m playwright install chromium firefox
 aztlan-route
 ```
 
-On Windows, activate with `.venv\\Scripts\\activate`.
+## Development tests
 
-## Configuration
-
-Provider metadata lives in `config/providers.json`. The default catalog intentionally labels browser-only providers as `manual_browser`: opening an authenticated website is supported, but automated interaction is not implied.
+```bash
+python -m pip install -e ".[dev]"
+python -m compileall -q src tests
+python -m pytest
+```
 
 ## Security
 
