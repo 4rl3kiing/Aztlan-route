@@ -72,8 +72,9 @@ def test_main_window_initializes_session_controls(qtbot, monkeypatch, tmp_path):
 
 
 def test_duplicate_profile_detection():
-    window = desktop.MainWindow.__new__(desktop.MainWindow)
-    window._sessions = [(object(), object(), "qwen", "chromium")]
-    assert window._profile_is_open("qwen", "chromium")
-    assert not window._profile_is_open("qwen", "firefox")
-    assert not window._profile_is_open("claude", "chromium")
+    state = type("SessionState", (), {
+        "_sessions": [(object(), object(), "qwen", "chromium")]
+    })()
+    assert desktop.MainWindow._profile_is_open(state, "qwen", "chromium")
+    assert not desktop.MainWindow._profile_is_open(state, "qwen", "firefox")
+    assert not desktop.MainWindow._profile_is_open(state, "claude", "chromium")
