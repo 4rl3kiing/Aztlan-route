@@ -14,12 +14,15 @@ Aztlan-route is a local-first desktop application for organizing access to AI pr
 ## Implemented
 
 - PySide6 desktop shell and provider selection.
-- Persistent Chromium and Firefox profile launch.
+- Persistent Chromium and Firefox profiles, each isolated by provider/browser.
+- Playwright runs on dedicated Qt worker threads rather than blocking the UI thread.
+- Active browser-session list, individual session closure and duplicate-profile launch prevention.
+- Failed page navigation triggers context cleanup to release profile locks.
 - Provider catalog validation and adapter contract.
 - Deterministic router for approved documented adapters.
 - Local conversation persistence and profile discovery.
-- Debian installer and desktop launcher.
-- Pytest suite and GitHub Actions checks.
+- Debian installer and desktop launcher with preservation of local user data.
+- Unit tests plus a CI smoke job that launches real Chromium and Firefox persistent contexts.
 
 The current provider catalog uses `manual_browser`. These entries open official websites but do not automate chat submission or scrape responses. No production provider API adapter is enabled until its documented interface and permitted use have been reviewed.
 
