@@ -184,6 +184,7 @@ class MainWindow(QMainWindow):
         self._sessions: list[tuple[QThread, BrowserSessionWorker, str, str]] = []
         self._auth_states: dict[str, str] = {}
         self._closing = False
+        self._shutdown_requested = False
         self.conversations = ConversationStore(self.data_root / "conversations.sqlite3")
         self.session_manager = SessionManager(self.profile_root)
         self.connection_manager = ProviderConnectionManager(self.providers)
@@ -361,15 +362,11 @@ class MainWindow(QMainWindow):
         if index < 0 or index >= len(self._sessions):
             return
         thread, worker, _provider_id, _browser = self._sessions[index]
-        try:
-            if thread.isRunning():
-                QMetaObject.invokeMethod(
-                    worker, "close", Qt.ConnectionType.BlockingQueuedConnection
-                )
-                thread.quit()
-                thread.wait()
-        except Exception as exc:
-            QMessageBox.warning(self, "Aztlan-route", f"No se pudo cerrar la sesión: {exc}")
+        if thread.isRunning():
+            self.close_session_button.setEnabled(False)
+            QMetaObject.invokeMethod(
+                worker, "close", Qt.ConnectionType.QueuedConnection
+            )
 
     def refresh_profiles(self) -> None:
         self.profile_list.clear()
@@ -395,6 +392,8 @@ class MainWindow(QMainWindow):
         self.confirm_authentication_button.setEnabled(self.active_sessions.currentRow() >= 0)
         self.reauthenticate_button.setEnabled(self.active_sessions.currentRow() >= 0)
         self.launch_button.setEnabled(bool(self._visible_providers))
+        if self._shutdown_requested and not self._sessions:
+            self.close()
 
     @Slot(str)
     def _show_browser_error(self, message: str) -> None:
@@ -431,22 +430,29 @@ class MainWindow(QMainWindow):
         thread.start()
 
     def closeEvent(self, event) -> None:
+        if self._shutdown_requested:
+            event.accept()
+            super().closeEvent(event)
+            return
+        if not self._sessions:
+            self._closing = True
+            event.accept()
+            super().closeEvent(event)
+            return
+
+        # Close browser contexts asynchronously so a slow Playwright call cannot
+        # freeze the Qt event loop while the window is shutting down.
         self._closing = True
+        self._shutdown_requested = True
+        event.ignore()
+        self.setEnabled(False)
         for thread, worker, _provider_id, _browser in reversed(self._sessions[:]):
-            try:
-                if thread.isRunning():
-                    QMetaObject.invokeMethod(
-                        worker, "close", Qt.ConnectionType.BlockingQueuedConnection
-                    )
-            except Exception:
-                # A failed session must not prevent the remaining sessions from closing.
-                pass
-            finally:
-                if thread.isRunning():
-                    thread.quit()
-                    thread.wait()
-        self._sessions.clear()
-        super().closeEvent(event)
+            if thread.isRunning():
+                QMetaObject.invokeMethod(
+                    worker, "close", Qt.ConnectionType.QueuedConnection
+                )
+            else:
+                thread.quit()
 
 
 def main() -> int:
