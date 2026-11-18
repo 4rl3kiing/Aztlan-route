@@ -1,0 +1,32 @@
+from pathlib import Path
+
+from aztlan_route import app as desktop
+from aztlan_route.providers import Provider
+
+
+def test_main_window_handles_empty_provider_catalog(qtbot, monkeypatch, tmp_path):
+    monkeypatch.setattr(desktop, "user_data_dir", lambda *args: str(tmp_path))
+    monkeypatch.setattr(desktop, "load_providers", lambda _path: [])
+    window = desktop.MainWindow()
+    qtbot.addWidget(window)
+    assert window.provider_list.count() == 1
+    assert not window.launch_button.isEnabled()
+    assert "No hay proveedores" in window.provider_list.item(0).text()
+
+
+def test_main_window_hides_disabled_providers(qtbot, monkeypatch, tmp_path):
+    monkeypatch.setattr(desktop, "user_data_dir", lambda *args: str(tmp_path))
+    disabled = Provider(
+        "offline", "Offline", "https://example.com", ("chromium",),
+        "disabled", False, "disabled for test",
+    )
+    enabled = Provider(
+        "manual", "Manual", "https://example.org", ("chromium",),
+        "manual_browser", False, "manual for test",
+    )
+    monkeypatch.setattr(desktop, "load_providers", lambda _path: [disabled, enabled])
+    window = desktop.MainWindow()
+    qtbot.addWidget(window)
+    assert window.provider_list.count() == 1
+    assert window.provider_list.item(0).text().startswith("Manual")
+    assert window.launch_button.isEnabled()
