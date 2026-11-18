@@ -46,8 +46,10 @@ class ProviderConnectionManager:
             raise KeyError(f"Unknown provider: {provider_id}") from exc
 
         if provider.integration_mode == "disabled":
-            return ProviderConnection(provider_id, ConnectionState.DISABLED,
-                                      "Proveedor deshabilitado en el catálogo.")
+            return ProviderConnection(
+                provider_id, ConnectionState.DISABLED,
+                "Proveedor deshabilitado en el catálogo.",
+            )
 
         if provider.integration_mode == "documented_api" and provider.automation_allowed:
             if self._adapter_registry is not None:
@@ -58,7 +60,8 @@ class ProviderConnectionManager:
                 else:
                     return ProviderConnection(
                         provider_id, ConnectionState.API_ADAPTER_READY,
-                        "Adaptador API registrado; la disponibilidad remota requiere una prueba aparte.",
+                        "Adaptador API registrado; la disponibilidad remota "
+                        "requiere una prueba aparte.",
                     )
             return ProviderConnection(
                 provider_id, ConnectionState.API_NOT_CONFIGURED,
