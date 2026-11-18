@@ -46,7 +46,8 @@ class BrowserSessionWorker(QObject):
             self._context = launch_provider(
                 self._driver, self.provider, self.browser, self.profile_root
             )
-            self._page = self._context.pages[0] if self._context.pages else None
+            pages = getattr(self._context, "pages", [])
+            self._page = pages[0] if pages else None
             self._auth_timer = QTimer(self)
             self._auth_timer.setInterval(2000)
             self._auth_timer.timeout.connect(self._inspect_authentication_challenge)
