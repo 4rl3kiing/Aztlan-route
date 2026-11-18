@@ -193,7 +193,7 @@ class OpenAICompatibleAdapter:
             transient = exc.code == 429 or exc.code == 408 or exc.code >= 500
             raise ProviderRequestError(self.provider_id, "HTTP request failed",
                                        status=exc.code, transient=transient) from None
-        except URLError:
+        except (URLError, TimeoutError, ConnectionError):
             raise ProviderRequestError(self.provider_id, "network request failed",
                                        transient=True) from None
         except (UnicodeDecodeError, json.JSONDecodeError):
@@ -230,7 +230,7 @@ class OpenAICompatibleAdapter:
             transient = exc.code == 429 or exc.code == 408 or exc.code >= 500
             raise ProviderRequestError(self.provider_id, "HTTP streaming request failed",
                                        status=exc.code, transient=transient) from None
-        except URLError:
+        except (URLError, TimeoutError, ConnectionError):
             raise ProviderRequestError(self.provider_id, "streaming network request failed",
                                        transient=True) from None
 
