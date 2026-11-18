@@ -55,6 +55,8 @@ def detect_authentication_state(
     login_form_detected: bool = False,
 ) -> str | None:
     """Detect explicit challenge or sign-in indicators without inspecting credentials."""
+    if not isinstance(url, str) or not isinstance(title, str):
+        return None
     challenge = detect_authentication_challenge(
         url=url,
         title=title,
