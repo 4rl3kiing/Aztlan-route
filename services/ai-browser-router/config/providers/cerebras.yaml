@@ -1,0 +1,10 @@
+id: cerebras
+name: Cerebras
+transport: openai-compatible
+base_url: https://api.cerebras.ai/v1
+api_key_env: CEREBRAS_API_KEY
+enabled: true
+models:
+  - id: llama-3.3-70b
+    name: Llama 3.3 70B
+    enabled: true

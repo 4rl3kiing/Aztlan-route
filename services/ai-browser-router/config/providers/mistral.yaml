@@ -1,0 +1,10 @@
+id: mistral
+name: Mistral
+transport: openai-compatible
+base_url: https://api.mistral.ai/v1
+api_key_env: MISTRAL_API_KEY
+enabled: true
+models:
+  - id: mistral-small-latest
+    name: Mistral Small
+    enabled: true

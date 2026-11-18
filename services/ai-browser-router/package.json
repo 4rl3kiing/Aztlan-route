@@ -1,0 +1,20 @@
+{
+  "name": "@aztlan/ai-browser-router",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/index.js",
+    "dev": "tsx watch src/index.ts",
+    "doctor": "tsx scripts/doctor.ts",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": { "yaml": "^2.8.1" },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

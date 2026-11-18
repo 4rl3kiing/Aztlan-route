@@ -1,0 +1,10 @@
+version: 1
+service:
+  host: 127.0.0.1
+  port: 8765
+  request_timeout_ms: 120000
+  max_body_bytes: 1048576
+  allow_remote_bind: false
+routing:
+  fallback_on_status: [408, 429, 500, 502, 503, 504]
+  max_fallbacks: 1

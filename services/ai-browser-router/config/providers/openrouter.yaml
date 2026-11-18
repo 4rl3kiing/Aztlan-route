@@ -1,0 +1,10 @@
+id: openrouter
+name: OpenRouter
+transport: openai-compatible
+base_url: https://openrouter.ai/api/v1
+api_key_env: OPENROUTER_API_KEY
+enabled: true
+models:
+  - id: meta-llama/llama-3.3-70b-instruct:free
+    name: Llama 3.3 70B Instruct (free tier, if offered)
+    enabled: true

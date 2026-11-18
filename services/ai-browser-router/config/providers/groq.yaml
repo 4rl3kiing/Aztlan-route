@@ -1,0 +1,13 @@
+id: groq
+name: Groq
+transport: openai-compatible
+base_url: https://api.groq.com/openai/v1
+api_key_env: GROQ_API_KEY
+enabled: true
+models:
+  - id: llama-3.3-70b-versatile
+    name: Llama 3.3 70B Versatile
+    enabled: true
+  - id: qwen/qwen3-32b
+    name: Qwen3 32B
+    enabled: true
