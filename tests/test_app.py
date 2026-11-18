@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from aztlan_route import app as desktop
 from aztlan_route.providers import Provider
 
