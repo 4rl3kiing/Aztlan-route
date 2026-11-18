@@ -9,6 +9,8 @@ from playwright.sync_api import sync_playwright
 def test_real_browser_persistent_context_smoke(tmp_path: Path, browser_name: str):
     with sync_playwright() as playwright:
         browser_type = getattr(playwright, browser_name)
+        if not Path(browser_type.executable_path).is_file():
+            pytest.skip(f"{browser_name} binary is not installed in this test environment")
         profile = tmp_path / browser_name
         context = browser_type.launch_persistent_context(
             user_data_dir=str(profile),
