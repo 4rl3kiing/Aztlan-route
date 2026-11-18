@@ -4,7 +4,9 @@ from __future__ import annotations
 import os
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 from .identifiers import validate_identifier
 
@@ -19,10 +21,18 @@ class ConversationStore:
         if os.name == "posix":
             self.database.chmod(0o600)
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.database)
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        try:
+            connection.execute("PRAGMA foreign_keys = ON")
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     def _initialize(self) -> None:
         with self._connect() as db:
