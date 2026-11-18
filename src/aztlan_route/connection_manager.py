@@ -1,9 +1,9 @@
 """Centralized, conservative provider connection state reporting."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Iterable
 
 from .adapters import AdapterRegistry, AdapterUnavailable
 from .providers import Provider
@@ -24,6 +24,7 @@ class ProviderConnection:
     provider_id: str
     state: ConnectionState
     detail: str
+    browser: str | None = None
 
 
 class ProviderConnectionManager:
@@ -93,8 +94,28 @@ class ProviderConnectionManager:
     def snapshot(
         self, browser_sessions: dict[str, str] | None = None
     ) -> list[ProviderConnection]:
+        """Return one status per active provider/browser session.
+
+        Session keys use the provider_id:browser form. Providers without
+        an active browser session still receive one catalog-level status row.
+        """
         sessions = browser_sessions or {}
-        return [
-            self.get_status(provider_id, sessions.get(provider_id))
-            for provider_id in self._providers
-        ]
+        result: list[ProviderConnection] = []
+        for provider_id in self._providers:
+            prefix = f"{provider_id}:"
+            active = [
+                (key[len(prefix):], state)
+                for key, state in sessions.items()
+                if key.startswith(prefix)
+            ]
+            if not active:
+                result.append(self.get_status(provider_id))
+                continue
+            for browser, state in sorted(active):
+                status = self.get_status(provider_id, state)
+                result.append(
+                    ProviderConnection(
+                        status.provider_id, status.state, status.detail, browser
+                    )
+                )
+        return result
