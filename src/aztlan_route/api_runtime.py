@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import statistics
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -297,15 +296,19 @@ class OpenAICompatibleRouter:
                     errors.append(exc)
                     continue
                 raise
-            self._metrics[adapter.provider_id].record(True, (time.monotonic() - started) * 1000)
-            breaker.record_success()
             yield first
             try:
                 yield from iterator
             except ProviderRequestError:
-                self._metrics[adapter.provider_id].record(False, 0)
+                self._metrics[adapter.provider_id].record(
+                    False, (time.monotonic() - started) * 1000
+                )
                 breaker.record_failure()
                 raise
+            self._metrics[adapter.provider_id].record(
+                True, (time.monotonic() - started) * 1000
+            )
+            breaker.record_success()
             return
         if errors:
             raise errors[-1]
