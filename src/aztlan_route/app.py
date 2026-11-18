@@ -160,6 +160,7 @@ class MainWindow(QMainWindow):
             )
         )
         worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
         thread.finished.connect(lambda: self._remove_session_thread(thread))
         self._sessions.append((thread, worker))
         thread.start()
