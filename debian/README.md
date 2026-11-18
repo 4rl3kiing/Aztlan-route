@@ -1,14 +1,23 @@
 # Debian deployment
 
+Target: Debian 12 (Bookworm) or newer, 64-bit desktop installation, Python 3.11+, and an active graphical session.
+
 From a cloned repository, run:
 
 ```bash
-chmod +x scripts/install-debian.sh
-./scripts/install-debian.sh
+bash scripts/install-debian.sh
 ```
 
-The installer uses a private virtual environment under `~/.local/opt/aztlan-route`, installs Chromium and Firefox with Playwright's Debian dependency installer, and creates a desktop launcher.
+The installer:
+- installs Python and the system libraries needed by Qt and Playwright;
+- creates an isolated virtual environment under `~/.local/opt/aztlan-route`;
+- installs both Chromium and Firefox with their required runtime dependencies;
+- creates a command at `~/.local/bin/aztlan-route` and a desktop launcher.
 
-Supported target: Debian 12 (Bookworm) or newer, 64-bit desktop installation, Python 3.11+. A graphical session is required to launch the desktop UI.
+Uninstall with:
 
-Uninstall with `scripts/uninstall-debian.sh`. By design, uninstall preserves local browser profiles and conversation history under the user's data directory.
+```bash
+bash scripts/uninstall-debian.sh
+```
+
+By design, uninstall preserves local browser profiles and conversation history under the user's application data directory. Remove that directory manually only if permanent deletion is intended.
