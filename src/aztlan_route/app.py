@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
         self.profile_root = self.data_root / "profiles"
         catalog = Path(__file__).with_name("providers.json")
         self.providers = load_providers(catalog)
-        self._sessions: list[tuple[QThread, BrowserSessionWorker]] = []
+        self._sessions: list[tuple[QThread, BrowserSessionWorker, str, str]] = []
         self._closing = False
         self.conversations = ConversationStore(self.data_root / "conversations.sqlite3")
         self.session_manager = SessionManager(self.profile_root)
@@ -145,6 +145,32 @@ class MainWindow(QMainWindow):
         self.refresh_profiles()
         self.launch_button.setEnabled(bool(self._visible_providers))
 
+    def refresh_active_sessions(self) -> None:
+        self.active_sessions.clear()
+        for _thread, _worker, provider_id, browser in self._sessions:
+            self.active_sessions.addItem(f"{provider_id} · {browser}")
+
+    def _profile_is_open(self, provider_id: str, browser: str) -> bool:
+        return any(
+            current_provider == provider_id and current_browser == browser
+            for _thread, _worker, current_provider, current_browser in self._sessions
+        )
+
+    def close_selected_session(self) -> None:
+        index = self.active_sessions.currentRow()
+        if index < 0 or index >= len(self._sessions):
+            return
+        thread, worker, _provider_id, _browser = self._sessions[index]
+        try:
+            if thread.isRunning():
+                QMetaObject.invokeMethod(
+                    worker, "close", Qt.ConnectionType.BlockingQueuedConnection
+                )
+                thread.quit()
+                thread.wait()
+        except Exception as exc:
+            QMessageBox.warning(self, "Aztlan-route", f"No se pudo cerrar la sesión: {exc}")
+
     def refresh_profiles(self) -> None:
         self.profile_list.clear()
         profiles = self.session_manager.list_profiles()
@@ -160,6 +186,8 @@ class MainWindow(QMainWindow):
             return
         self._sessions = [item for item in self._sessions if item[0] is not thread]
         thread.deleteLater()
+        self.refresh_active_sessions()
+        self.close_session_button.setEnabled(self.active_sessions.currentRow() >= 0)
         self.launch_button.setEnabled(bool(self._visible_providers))
 
     @Slot(str)
@@ -175,6 +203,12 @@ class MainWindow(QMainWindow):
 
         provider = self._visible_providers[index]
         browser = self.browser_choice.currentData()
+        if self._profile_is_open(provider.id, browser):
+            QMessageBox.information(
+                self, "Sesión existente",
+                "Ese perfil ya está abierto. Cierra la sesión actual antes de volver a abrirlo."
+            )
+            return
         self.launch_button.setEnabled(False)
         thread = QThread(self)
         worker = BrowserSessionWorker(provider, browser, self.profile_root)
@@ -183,14 +217,16 @@ class MainWindow(QMainWindow):
         worker.opened.connect(self._on_session_opened)
         worker.failed.connect(self._show_browser_error)
         worker.failed.connect(thread.quit)
+        worker.closed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
         thread.finished.connect(self._on_thread_finished)
-        self._sessions.append((thread, worker))
+        self._sessions.append((thread, worker, provider.id, browser))
+        self.refresh_active_sessions()
         thread.start()
 
     def closeEvent(self, event) -> None:
         self._closing = True
-        for thread, worker in reversed(self._sessions[:]):
+        for thread, worker, _provider_id, _browser in reversed(self._sessions[:]):
             try:
                 if thread.isRunning():
                     QMetaObject.invokeMethod(
