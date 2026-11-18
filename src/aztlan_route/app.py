@@ -41,7 +41,7 @@ class BrowserSessionWorker(QObject):
             self._context = launch_provider(
                 self._driver, self.provider, self.browser, self.profile_root
             )
-        except (PlaywrightError, OSError, ValueError, RuntimeError) as exc:
+        except Exception as exc:
             try:
                 self._stop_resources()
             except Exception:
@@ -90,6 +90,7 @@ class MainWindow(QMainWindow):
         catalog = Path(__file__).with_name("providers.json")
         self.providers = load_providers(catalog)
         self._sessions: list[tuple[QThread, BrowserSessionWorker]] = []
+        self._closing = False
         self.conversations = ConversationStore(self.data_root / "conversations.sqlite3")
         self.session_manager = SessionManager(self.profile_root)
 
@@ -163,7 +164,8 @@ class MainWindow(QMainWindow):
 
     @Slot(str)
     def _show_browser_error(self, message: str) -> None:
-        QMessageBox.critical(self, "No se pudo abrir/cerrar el navegador", message)
+        if not self._closing:
+            QMessageBox.critical(self, "No se pudo abrir/cerrar el navegador", message)
 
     def open_provider(self) -> None:
         index = self.provider_list.currentRow()
@@ -187,6 +189,7 @@ class MainWindow(QMainWindow):
         thread.start()
 
     def closeEvent(self, event) -> None:
+        self._closing = True
         for thread, worker in reversed(self._sessions[:]):
             try:
                 if thread.isRunning():
