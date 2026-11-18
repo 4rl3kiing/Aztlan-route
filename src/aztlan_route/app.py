@@ -64,6 +64,7 @@ class BrowserSessionWorker(QObject):
             except Exception:
                 pass
             self.failed.emit(str(exc))
+            self.closed.emit()
             return
         self.opened.emit()
 
@@ -443,7 +444,6 @@ class MainWindow(QMainWindow):
         worker.opened.connect(self._on_session_opened)
         worker.authentication_state.connect(self._on_authentication_state)
         worker.failed.connect(self._show_browser_error)
-        worker.failed.connect(thread.quit)
         worker.closed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
         thread.finished.connect(self._on_thread_finished)
