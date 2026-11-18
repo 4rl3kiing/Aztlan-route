@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "providers": [
+    {"id":"chatgpt","name":"ChatGPT","url":"https://chatgpt.com/","browser_support":["chromium","firefox"],"integration_mode":"manual_browser","automation_allowed":false,"notes":"Manual browser access only."},
+    {"id":"gemini","name":"Google Gemini","url":"https://gemini.google.com/","browser_support":["chromium","firefox"],"integration_mode":"manual_browser","automation_allowed":false,"notes":"Manual browser access only."},
+    {"id":"claude","name":"Claude","url":"https://claude.ai/","browser_support":["chromium","firefox"],"integration_mode":"manual_browser","automation_allowed":false,"notes":"Manual browser access only."},
+    {"id":"qwen","name":"Qwen","url":"https://chat.qwen.ai/","browser_support":["chromium","firefox"],"integration_mode":"manual_browser","automation_allowed":false,"notes":"Manual browser access only."},
+    {"id":"deepseek","name":"DeepSeek","url":"https://chat.deepseek.com/","browser_support":["chromium","firefox"],"integration_mode":"manual_browser","automation_allowed":false,"notes":"Manual browser access only."}
+  ]
+}
