@@ -21,4 +21,4 @@ Uninstall with:
 bash scripts/uninstall-debian.sh
 ```
 
-By design, uninstall preserves local browser profiles and conversation history in the platformdirs XDG data directory: `${XDG_DATA_HOME:-~/.local/share}/Aztlan/Aztlan-route`. It also preserves Playwright's shared browser cache at `~/.cache/ms-playwright`.
+By design, uninstall preserves local browser profiles and conversation history in the platformdirs XDG data directory: `${XDG_DATA_HOME:-~/.local/share}/Aztlan-route`. It also preserves Playwright's shared browser cache at `~/.cache/ms-playwright`.
