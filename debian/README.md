@@ -10,7 +10,8 @@ bash scripts/install-debian.sh
 
 The installer:
 - installs Python and the system libraries needed by Qt and Playwright;
-- creates an isolated virtual environment under `~/.local/opt/aztlan-route`;
+- stages only `pyproject.toml`, `README.md` and the application source under `~/.local/opt/aztlan-route/source` (it does not copy Git metadata, virtual environments, profiles or local data);
+- recreates the isolated virtual environment on every installation to prevent stale package files;
 - installs both Chromium and Firefox with their required runtime dependencies;
 - creates a command at `~/.local/bin/aztlan-route` and a desktop launcher.
 
@@ -20,4 +21,4 @@ Uninstall with:
 bash scripts/uninstall-debian.sh
 ```
 
-By design, uninstall preserves local browser profiles and conversation history under the user's application data directory. Remove that directory manually only if permanent deletion is intended.
+By design, uninstall preserves local browser profiles and conversation history in the platformdirs XDG data directory: `${XDG_DATA_HOME:-~/.local/share}/Aztlan/Aztlan-route`. It also preserves Playwright's shared browser cache at `~/.cache/ms-playwright`.
