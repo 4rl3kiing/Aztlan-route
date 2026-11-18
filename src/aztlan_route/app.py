@@ -99,6 +99,9 @@ class BrowserSessionWorker(QObject):
                     ).count(),
                     login_form_detected=(
                         self._page.locator('form:has(input[type="password"])').count() > 0
+                        and self._page.locator(
+                            'form:has(input[type="password"])'
+                        ).first.is_visible()
                     ),
                 )
         except Exception:
