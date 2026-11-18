@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from playwright.sync_api import sync_playwright
 
 from . import __version__
-from .authentication import detect_authentication_challenge
+from .authentication import detect_authentication_state
 from .browser import launch_provider
 from .conversations import ConversationStore
 from .providers import Provider, load_providers
@@ -64,43 +64,64 @@ class BrowserSessionWorker(QObject):
 
     @Slot()
     def _inspect_authentication_challenge(self) -> None:
-        """Detect common challenge indicators without reading page text or secrets."""
-        if (
-            self._context is None
-            or self._authentication_status == "authenticated_user_confirmed"
-        ):
+        """Monitor explicit sign-in challenges and page closure without reading secrets."""
+        if self._context is None:
             return
         try:
             pages = self._context.pages
             if not pages:
-                return
-            # Providers may open a dedicated challenge or callback tab after launch.
-            self._page = pages[-1]
-            url = self._page.url or ""
-            title = self._page.title()
-            challenge = detect_authentication_challenge(
-                url=url,
-                title=title,
-                captcha_element_count=self._page.locator(
-                    'iframe[src*="captcha" i], [id*="captcha" i], [class*="captcha" i]'
-                ).count(),
-                mfa_element_count=self._page.locator(
-                    'input[autocomplete="one-time-code"], input[name*="otp" i], '
-                    'input[name*="verification-code" i]'
-                ).count(),
-            )
+                state = "browser_page_closed"
+            else:
+                # Providers may open a dedicated challenge or callback tab after launch.
+                self._page = pages[-1]
+                url = self._page.url or ""
+                title = self._page.title()
+                state = detect_authentication_state(
+                    url=url,
+                    title=title,
+                    captcha_element_count=self._page.locator(
+                        'iframe[src*="captcha" i], [id*="captcha" i], [class*="captcha" i]'
+                    ).count(),
+                    mfa_element_count=self._page.locator(
+                        'input[autocomplete="one-time-code"], input[name*="otp" i], '
+                        'input[name*="verification-code" i]'
+                    ).count(),
+                    login_form_detected=(
+                        self._page.locator('form:has(input[type="password"])').count() > 0
+                    ),
+                )
         except Exception:
             # A transient navigation or closed page must not terminate the browser session.
             return
-        if challenge and challenge != self._authentication_status:
-            self._authentication_status = challenge
-            self.authentication_state.emit(self.provider.id, self.browser, challenge)
+        if state is not None and state != self._authentication_status:
+            self._authentication_status = state
+            self.authentication_state.emit(self.provider.id, self.browser, state)
 
     @Slot()
     def confirm_authenticated(self) -> None:
         """Record the operator's explicit confirmation; this is not API verification."""
+        if self._context is None:
+            return
         self._authentication_status = "authenticated_user_confirmed"
         self.authentication_state.emit(self.provider.id, self.browser, self._authentication_status)
+
+    @Slot()
+    def request_reauthentication(self) -> None:
+        """Bring the existing provider profile forward or reopen its official start page."""
+        if self._context is None:
+            return
+        try:
+            pages = self._context.pages
+            if pages:
+                self._page = pages[-1]
+                self._page.bring_to_front()
+            else:
+                self._page = self._context.new_page()
+                self._page.goto(self.provider.url, wait_until="domcontentloaded")
+            self._authentication_status = "awaiting_user"
+            self.authentication_state.emit(self.provider.id, self.browser, self._authentication_status)
+        except Exception as exc:
+            self.failed.emit(f"No se pudo reabrir el proveedor para autenticación: {exc}")
 
     def _stop_resources(self) -> None:
         errors = []
@@ -198,6 +219,10 @@ class MainWindow(QMainWindow):
         self.confirm_authentication_button.setEnabled(False)
         self.confirm_authentication_button.clicked.connect(self.confirm_selected_authentication)
         layout.addWidget(self.confirm_authentication_button)
+        self.reauthenticate_button = QPushButton("Reabrir proveedor / reautenticar")
+        self.reauthenticate_button.setEnabled(False)
+        self.reauthenticate_button.clicked.connect(self.reauthenticate_selected_session)
+        layout.addWidget(self.reauthenticate_button)
 
         self.close_session_button = QPushButton("Cerrar sesión seleccionada")
         self.close_session_button.setEnabled(False)
@@ -226,6 +251,7 @@ class MainWindow(QMainWindow):
         valid = 0 <= row < len(self._sessions)
         self.close_session_button.setEnabled(valid)
         self.confirm_authentication_button.setEnabled(valid)
+        self.reauthenticate_button.setEnabled(valid)
         if not valid:
             self.authentication_status_label.setText("Autenticación: sin sesión seleccionada")
             return
@@ -242,6 +268,8 @@ class MainWindow(QMainWindow):
             "captcha_required": "CAPTCHA detectado; requiere resolución manual",
             "mfa_required": "MFA detectado; requiere verificación manual",
             "authenticated_user_confirmed": "confirmada por el usuario (no verifica acceso API)",
+            "reauthentication_required": "sesión expirada o inicio de sesión requerido",
+            "browser_page_closed": "pestaña cerrada; se puede reabrir el proveedor",
         }
         return labels.get(state, "estado desconocido")
 
@@ -271,6 +299,16 @@ class MainWindow(QMainWindow):
         _thread, worker, _provider_id, _browser = self._sessions[index]
         if worker.thread().isRunning():
             QMetaObject.invokeMethod(worker, "confirm_authenticated", Qt.ConnectionType.QueuedConnection)
+
+    def reauthenticate_selected_session(self) -> None:
+        index = self.active_sessions.currentRow()
+        if index < 0 or index >= len(self._sessions):
+            return
+        _thread, worker, _provider_id, _browser = self._sessions[index]
+        if worker.thread().isRunning():
+            QMetaObject.invokeMethod(
+                worker, "request_reauthentication", Qt.ConnectionType.QueuedConnection
+            )
 
     def _profile_is_open(self, provider_id: str, browser: str) -> bool:
         return any(
@@ -306,10 +344,15 @@ class MainWindow(QMainWindow):
         thread = self.sender()
         if not isinstance(thread, QThread):
             return
+        for item in self._sessions:
+            if item[0] is thread:
+                self._auth_states.pop(self._session_key(item[2], item[3]), None)
         self._sessions = [item for item in self._sessions if item[0] is not thread]
         thread.deleteLater()
         self.refresh_active_sessions()
         self.close_session_button.setEnabled(self.active_sessions.currentRow() >= 0)
+        self.confirm_authentication_button.setEnabled(self.active_sessions.currentRow() >= 0)
+        self.reauthenticate_button.setEnabled(self.active_sessions.currentRow() >= 0)
         self.launch_button.setEnabled(bool(self._visible_providers))
 
     @Slot(str)
