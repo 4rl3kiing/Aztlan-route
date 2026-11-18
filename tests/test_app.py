@@ -163,6 +163,7 @@ def test_worker_confirmation_emits_explicit_user_confirmed_state(tmp_path):
         "manual_browser", False, "manual for test",
     )
     worker = BrowserSessionWorker(provider, "chromium", tmp_path)
+    worker._context = object()
     received = []
     worker.authentication_state.connect(lambda *args: received.append(args))
 
@@ -191,6 +192,7 @@ def test_worker_reauthentication_reuses_existing_context(tmp_path):
 
     worker = BrowserSessionWorker(provider, "chromium", tmp_path)
     worker._context = Context()
+    worker._driver = object()
     received = []
     worker.authentication_state.connect(lambda *args: received.append(args))
 
@@ -226,6 +228,7 @@ def test_worker_reauthentication_reopens_closed_tab(tmp_path):
 
     worker = BrowserSessionWorker(provider, "chromium", tmp_path)
     worker._context = Context()
+    worker._driver = object()
     worker.request_reauthentication()
 
     assert worker._page is worker._context.pages[0]
