@@ -1,6 +1,6 @@
 import pytest
 
-from aztlan_route.authentication import detect_authentication_challenge
+from aztlan_route.authentication import detect_authentication_challenge, detect_authentication_state
 
 
 @pytest.mark.parametrize(
@@ -38,3 +38,26 @@ def test_captcha_takes_precedence_over_mfa():
 )
 def test_invalid_detector_input_is_ignored(kwargs):
     assert detect_authentication_challenge(**kwargs) is None
+
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected"),
+    [
+        ({"url": "https://example.com/login", "title": "Sign in"}, "reauthentication_required"),
+        ({"url": "https://example.com/session-expired", "title": "Welcome"}, "reauthentication_required"),
+        ({"url": "https://example.com/account", "title": "Account", "login_form_detected": True}, "reauthentication_required"),
+        ({"url": "https://example.com/app", "title": "Dashboard"}, None),
+        ({"url": "https://example.com/app", "title": "Dashboard", "login_form_detected": False}, None),
+    ],
+)
+def test_detect_reauthentication_state(kwargs, expected):
+    assert detect_authentication_state(**kwargs) == expected
+
+
+def test_challenge_state_takes_precedence_over_reauthentication():
+    assert detect_authentication_state(
+        url="https://example.com/login",
+        title="Sign in",
+        captcha_element_count=1,
+    ) == "captcha_required"
