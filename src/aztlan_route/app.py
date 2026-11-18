@@ -16,6 +16,7 @@ from . import __version__
 from .authentication import detect_authentication_state
 from .browser import launch_provider
 from .conversations import ConversationStore
+from .connection_manager import ProviderConnectionManager
 from .providers import Provider, load_providers
 from .sessions import SessionManager
 
@@ -192,6 +193,7 @@ class MainWindow(QMainWindow):
         self._closing = False
         self.conversations = ConversationStore(self.data_root / "conversations.sqlite3")
         self.session_manager = SessionManager(self.profile_root)
+        self.connection_manager = ProviderConnectionManager(self.providers)
 
         central = QWidget()
         layout = QVBoxLayout(central)
@@ -212,6 +214,10 @@ class MainWindow(QMainWindow):
         else:
             self.provider_list.addItem("No hay proveedores habilitados.")
         layout.addWidget(self.provider_list)
+        layout.addWidget(QLabel("Estado de conexión y capacidades"))
+        self.connection_status_list = QListWidget()
+        layout.addWidget(self.connection_status_list)
+        self.refresh_connection_statuses()
 
         layout.addWidget(QLabel("Navegador"))
         self.browser_choice = QComboBox()
@@ -299,9 +305,31 @@ class MainWindow(QMainWindow):
     def _on_authentication_state(self, provider_id: str, browser: str, state: str) -> None:
         self._auth_states[self._session_key(provider_id, browser)] = state
         self.refresh_active_sessions()
+        self.refresh_connection_statuses()
         row = self.active_sessions.currentRow()
         if 0 <= row < len(self._sessions):
             self._on_active_session_selected(row)
+
+    def refresh_connection_statuses(self) -> None:
+        self.connection_status_list.clear()
+        session_states = {
+            provider_id: state
+            for key, state in self._auth_states.items()
+            for provider_id, _browser in [key.split(":", 1)]
+        }
+        labels = {
+            "disabled": "Deshabilitado",
+            "manual_only": "Sólo navegación manual",
+            "authentication_required": "Requiere autenticación manual",
+            "web_session_confirmed": "Sesión web confirmada (sin API)",
+            "browser_unavailable": "Navegador no disponible",
+            "api_not_configured": "API no configurada",
+            "api_adapter_ready": "Adaptador API registrado (sin prueba remota)",
+        }
+        for status in self.connection_manager.snapshot(session_states):
+            self.connection_status_list.addItem(
+                f"{status.provider_id}: {labels[status.state.value]} — {status.detail}"
+            )
 
     def refresh_active_sessions(self) -> None:
         selected = self.active_sessions.currentRow()
@@ -370,6 +398,7 @@ class MainWindow(QMainWindow):
             if item[0] is thread:
                 self._auth_states.pop(self._session_key(item[2], item[3]), None)
         self._sessions = [item for item in self._sessions if item[0] is not thread]
+        self.refresh_connection_statuses()
         thread.deleteLater()
         self.refresh_active_sessions()
         self.close_session_button.setEnabled(self.active_sessions.currentRow() >= 0)
