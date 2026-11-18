@@ -2,26 +2,22 @@
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 
 from playwright.sync_api import BrowserContext, Playwright
 
+from .identifiers import validate_identifier
 from .providers import Provider, SUPPORTED_BROWSERS
-
-_SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")
 
 
 def profile_path(root: Path, provider_id: str, browser: str) -> Path:
-    if not _SAFE_ID.fullmatch(provider_id):
-        raise ValueError("Invalid provider identifier")
+    validate_identifier(provider_id, label="provider id")
     if browser not in SUPPORTED_BROWSERS:
         raise ValueError("Unsupported browser")
     return root / provider_id / browser
 
 
 def _secure_directory(path: Path) -> None:
-    # Secure every directory level that contains the profile, not only the leaf.
     for directory in (path.parents[1], path.parent, path):
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         if os.name == "posix":
@@ -36,6 +32,8 @@ def launch_provider(
     *,
     headless: bool = False,
 ) -> BrowserContext:
+    if provider.integration_mode == "disabled":
+        raise ValueError(f"{provider.name} is disabled in the provider catalog")
     if browser not in provider.browser_support:
         raise ValueError(f"{provider.name} does not list {browser} as supported")
     if browser not in SUPPORTED_BROWSERS:
